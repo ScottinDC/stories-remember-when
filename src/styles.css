@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+audio {
+  border-radius: 0;
+}
+
+.large-button {
+  align-items: center;
+  border: 2px solid transparent;
+  display: inline-flex;
+  font-size: 1.5rem;
+  font-weight: 800;
+  gap: 0.85rem;
+  justify-content: center;
+  min-height: 5.5rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.large-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.large-button.primary {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.large-button.secondary {
+  background: #ffffff;
+  border-color: #a8a29e;
+  color: #1c1917;
+}
+
+.large-button.danger {
+  background: #b91c1c;
+  color: #ffffff;
+}

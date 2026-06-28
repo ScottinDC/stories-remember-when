@@ -1,0 +1,24 @@
+export type MemoryNode = {
+  id: string;
+  threadId: string;
+  parentQuestionId: string | null;
+  question: string;
+  transcript: string | null;
+  mp3Url: string | null;
+  gcsObjectName: string | null;
+  timestamp: string;
+  metadata: Record<string, unknown> | null;
+  status: "pending" | "answered";
+};
+
+export type InterviewThread = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InterviewState = {
+  thread: InterviewThread;
+  nodes: MemoryNode[];
+};
