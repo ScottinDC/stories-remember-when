@@ -1,20 +1,28 @@
-import { Storage } from "@google-cloud/storage";
 import { randomUUID } from "node:crypto";
+import { getBucketName, getStorageClient } from "./gcs-client";
 
-const bucketName = process.env.GOOGLE_CLOUD_STORAGE_BUCKET;
+export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> {
+  const storage = getStorageClient();
+  const file = storage.bucket(getBucketName()).file(objectName);
 
-function createStorageClient() {
-  const serviceAccountJson = process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON;
-  if (serviceAccountJson) {
-    const credentials = JSON.parse(serviceAccountJson);
-    return new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT ?? credentials.project_id,
-      credentials
-    });
+  try {
+    const [exists] = await file.exists();
+    if (!exists) {
+      return null;
+    }
+    const [contents] = await file.download();
+    return JSON.parse(contents.toString("utf8")) as T;
+  } catch {
+    return null;
   }
+}
 
-  return new Storage({
-    projectId: process.env.GOOGLE_CLOUD_PROJECT
+export async function writeJsonToGcs(objectName: string, value: unknown) {
+  const storage = getStorageClient();
+  const file = storage.bucket(getBucketName()).file(objectName);
+  await file.save(JSON.stringify(value, null, 2), {
+    resumable: false,
+    contentType: "application/json"
   });
 }
 
@@ -22,18 +30,18 @@ export async function uploadAudioToGcs(input: {
   buffer: Buffer;
   threadId: string;
   questionId: string;
+  extension?: string;
+  contentType?: string;
 }) {
-  if (!bucketName) {
-    throw new Error("GOOGLE_CLOUD_STORAGE_BUCKET is not configured.");
-  }
-
-  const storage = createStorageClient();
-  const objectName = `threads/${input.threadId}/${input.questionId}/${Date.now()}-${randomUUID()}.mp3`;
-  const file = storage.bucket(bucketName).file(objectName);
+  const extension = input.extension ?? "webm";
+  const contentType = input.contentType ?? "audio/webm";
+  const storage = getStorageClient();
+  const objectName = `threads/${input.threadId}/${input.questionId}/${Date.now()}-${randomUUID()}.${extension}`;
+  const file = storage.bucket(getBucketName()).file(objectName);
 
   await file.save(input.buffer, {
     resumable: false,
-    contentType: "audio/mpeg",
+    contentType,
     metadata: {
       metadata: {
         threadId: input.threadId,

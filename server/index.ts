@@ -2,16 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import multer from "multer";
-import {
-  addFollowUpQuestion,
-  getNode,
-  getOrCreateDefaultThread,
-  getThreadState,
-  markNodeAnswered
-} from "./db";
-import { generateFollowUp, transcribeAudio } from "./ai";
-import { convertToMp3 } from "./audio";
-import { uploadAudioToGcs } from "./storage";
+import { handleGetInterview, handleHealth, handlePostAnswer } from "./handlers";
 
 const app = express();
 const upload = multer({
@@ -24,70 +15,38 @@ const upload = multer({
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+app.get("/api/health", async (_req, res, next) => {
+  try {
+    res.json(await handleHealth());
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.get("/api/interview", (_req, res) => {
-  res.json(getOrCreateDefaultThread());
+app.get("/api/interview", async (_req, res, next) => {
+  try {
+    res.json(await handleGetInterview());
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/responses/:questionId/answer", upload.single("audio"), async (req, res, next) => {
   try {
-    const questionId = String(req.params.questionId);
-    const node = getNode(questionId);
-    if (!node) {
-      res.status(404).json({ error: "Question not found." });
-      return;
-    }
-
     if (!req.file) {
       res.status(400).json({ error: "An audio file is required." });
       return;
     }
 
-    const mp3Buffer = await convertToMp3(req.file.buffer);
-    const uploaded = await uploadAudioToGcs({
-      buffer: mp3Buffer,
-      threadId: node.threadId,
-      questionId: node.id
+    const result = await handlePostAnswer({
+      questionId: String(req.params.questionId),
+      audioBuffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      originalFilename: req.file.originalname,
+      sourceByteLength: req.file.size
     });
 
-    const transcript = await transcribeAudio(mp3Buffer, "answer.mp3");
-    const answeredNode = markNodeAnswered({
-      id: node.id,
-      transcript,
-      mp3Url: uploaded.url,
-      gcsObjectName: uploaded.objectName,
-      metadata: {
-        originalFilename: req.file.originalname,
-        mimeType: req.file.mimetype,
-        sourceByteLength: req.file.size,
-        mp3ByteLength: mp3Buffer.byteLength
-      }
-    });
-
-    if (!answeredNode) {
-      res.status(500).json({ error: "Could not save response." });
-      return;
-    }
-
-    const currentState = getThreadState(answeredNode.threadId);
-    const followUpQuestion = await generateFollowUp(currentState.nodes, answeredNode);
-    const followUpNode = addFollowUpQuestion({
-      threadId: answeredNode.threadId,
-      parentQuestionId: answeredNode.id,
-      question: followUpQuestion,
-      metadata: {
-        generatedBy: process.env.OPENAI_MODEL ?? "gpt-4.1-mini"
-      }
-    });
-
-    res.json({
-      answeredNode,
-      followUpNode,
-      state: getThreadState(answeredNode.threadId)
-    });
+    res.status(result.status).json(result.body);
   } catch (error) {
     next(error);
   }

@@ -8,7 +8,7 @@ export type MemoryNode = {
   gcsObjectName: string | null;
   timestamp: string;
   metadata: Record<string, unknown> | null;
-  status: "pending" | "answered";
+  status: "pending" | "processing" | "answered";
 };
 
 export type InterviewThread = {

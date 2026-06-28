@@ -6,7 +6,42 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export async function convertToMp3(buffer: Buffer) {
+export type PreparedAudio = {
+  buffer: Buffer;
+  filename: string;
+  contentType: string;
+  extension: string;
+};
+
+export async function prepareAudioForUpload(buffer: Buffer, mimeType: string): Promise<PreparedAudio> {
+  if (process.env.NETLIFY) {
+    return {
+      buffer,
+      filename: mimeType.includes("mp4") ? "answer.m4a" : "answer.webm",
+      contentType: mimeType || "audio/webm",
+      extension: mimeType.includes("mp4") ? "m4a" : "webm"
+    };
+  }
+
+  try {
+    const mp3Buffer = await convertToMp3(buffer);
+    return {
+      buffer: mp3Buffer,
+      filename: "answer.mp3",
+      contentType: "audio/mpeg",
+      extension: "mp3"
+    };
+  } catch {
+    return {
+      buffer,
+      filename: mimeType.includes("mp4") ? "answer.m4a" : "answer.webm",
+      contentType: mimeType || "audio/webm",
+      extension: mimeType.includes("mp4") ? "m4a" : "webm"
+    };
+  }
+}
+
+async function convertToMp3(buffer: Buffer) {
   const tmpDir = await mkdtemp(path.join(os.tmpdir(), "remember-when-"));
   const inputPath = path.join(tmpDir, "input.audio");
   const outputPath = path.join(tmpDir, "answer.mp3");

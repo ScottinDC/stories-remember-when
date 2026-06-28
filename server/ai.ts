@@ -13,9 +13,9 @@ function getOpenAiClient() {
   });
 }
 
-export async function transcribeAudio(buffer: Buffer, filename = "answer.mp3") {
+export async function transcribeAudio(buffer: Buffer, filename = "answer.webm", contentType = "audio/webm") {
   const openai = getOpenAiClient();
-  const file = await toFile(buffer, filename, { type: "audio/mpeg" });
+  const file = await toFile(buffer, filename, { type: contentType });
   const transcription = await openai.audio.transcriptions.create({
     file,
     model: process.env.OPENAI_TRANSCRIPTION_MODEL ?? "whisper-1"

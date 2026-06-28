@@ -1,0 +1,183 @@
+import { randomUUID } from "node:crypto";
+import { INITIAL_QUESTIONS } from "./interview";
+import { readJsonFromGcs, writeJsonToGcs } from "./storage";
+import type { InterviewState, InterviewThread, MemoryNode } from "./types";
+
+const STATE_OBJECT = "app/interview-state.json";
+
+async function loadState(): Promise<InterviewState | null> {
+  return readJsonFromGcs<InterviewState>(STATE_OBJECT);
+}
+
+async function persistState(state: InterviewState) {
+  await writeJsonToGcs(STATE_OBJECT, state);
+}
+
+function createInitialState(): InterviewState {
+  const now = new Date().toISOString();
+  const threadId = randomUUID();
+  const thread: InterviewThread = {
+    id: threadId,
+    title: "Dad's Life Story",
+    createdAt: now,
+    updatedAt: now
+  };
+
+  const nodes: MemoryNode[] = INITIAL_QUESTIONS.map((question) => ({
+    id: randomUUID(),
+    threadId,
+    parentQuestionId: null,
+    question,
+    transcript: null,
+    mp3Url: null,
+    gcsObjectName: null,
+    timestamp: now,
+    metadata: null,
+    status: "pending"
+  }));
+
+  return { thread, nodes };
+}
+
+export async function getOrCreateDefaultThread(): Promise<InterviewState> {
+  const existing = await loadState();
+  if (existing) {
+    return existing;
+  }
+
+  const initial = createInitialState();
+  await persistState(initial);
+  return initial;
+}
+
+export async function getThreadState(threadId: string): Promise<InterviewState> {
+  const state = await loadState();
+  if (!state || state.thread.id !== threadId) {
+    throw new Error("Thread not found.");
+  }
+  return state;
+}
+
+export async function getNode(id: string): Promise<MemoryNode | undefined> {
+  const state = await loadState();
+  return state?.nodes.find((node) => node.id === id);
+}
+
+export async function markNodeProcessing(input: {
+  id: string;
+  mp3Url: string;
+  gcsObjectName: string;
+  metadata: Record<string, unknown>;
+}) {
+  const state = await loadState();
+  if (!state) {
+    return undefined;
+  }
+
+  const now = new Date().toISOString();
+  const index = state.nodes.findIndex((node) => node.id === input.id);
+  if (index === -1) {
+    return undefined;
+  }
+
+  state.nodes[index] = {
+    ...state.nodes[index],
+    mp3Url: input.mp3Url,
+    gcsObjectName: input.gcsObjectName,
+    timestamp: now,
+    metadata: input.metadata,
+    status: "processing"
+  };
+  state.thread.updatedAt = now;
+  await persistState(state);
+  return state.nodes[index];
+}
+
+export async function markNodeAnswered(input: {
+  id: string;
+  transcript: string;
+  mp3Url: string;
+  gcsObjectName: string;
+  metadata: Record<string, unknown>;
+}) {
+  const state = await loadState();
+  if (!state) {
+    return undefined;
+  }
+
+  const now = new Date().toISOString();
+  const index = state.nodes.findIndex((node) => node.id === input.id);
+  if (index === -1) {
+    return undefined;
+  }
+
+  state.nodes[index] = {
+    ...state.nodes[index],
+    transcript: input.transcript,
+    mp3Url: input.mp3Url,
+    gcsObjectName: input.gcsObjectName,
+    timestamp: now,
+    metadata: input.metadata,
+    status: "answered"
+  };
+  state.thread.updatedAt = now;
+  await persistState(state);
+  return state.nodes[index];
+}
+
+export async function markNodeFailed(id: string, message: string) {
+  const state = await loadState();
+  if (!state) {
+    return undefined;
+  }
+
+  const now = new Date().toISOString();
+  const index = state.nodes.findIndex((node) => node.id === id);
+  if (index === -1) {
+    return undefined;
+  }
+
+  state.nodes[index] = {
+    ...state.nodes[index],
+    timestamp: now,
+    metadata: {
+      ...(state.nodes[index].metadata ?? {}),
+      error: message
+    },
+    status: "pending"
+  };
+  state.thread.updatedAt = now;
+  await persistState(state);
+  return state.nodes[index];
+}
+
+export async function addFollowUpQuestion(input: {
+  threadId: string;
+  parentQuestionId: string;
+  question: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const state = await loadState();
+  if (!state || state.thread.id !== input.threadId) {
+    return undefined;
+  }
+
+  const now = new Date().toISOString();
+  const node: MemoryNode = {
+    id: randomUUID(),
+    threadId: input.threadId,
+    parentQuestionId: input.parentQuestionId,
+    question: input.question,
+    transcript: null,
+    mp3Url: null,
+    gcsObjectName: null,
+    timestamp: now,
+    metadata: input.metadata ?? null,
+    status: "pending"
+  };
+
+  state.nodes.push(node);
+  state.thread.updatedAt = now;
+  await persistState(state);
+  return node;
+}

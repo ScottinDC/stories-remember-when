@@ -24,17 +24,37 @@ GOOGLE_CLOUD_STORAGE_BUCKET=...
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
 ```
 
-For hosted deployments, set `GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON` instead of `GOOGLE_APPLICATION_CREDENTIALS`.
+Locally, interview data is stored in SQLite. Audio uploads go to Google Cloud Storage.
 
-The server uses `ffmpeg` to convert browser-recorded audio into MP3 before uploading to Google Cloud Storage.
+## Deploy on Netlify
+
+The site publishes the Vite frontend from `dist/` and runs the API as a Netlify Function.
+
+Set these environment variables in the Netlify site settings:
+
+```bash
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_TRANSCRIPTION_MODEL=whisper-1
+GOOGLE_CLOUD_PROJECT=...
+GOOGLE_CLOUD_STORAGE_BUCKET=...
+GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+On Netlify:
+
+- Interview state is stored in Google Cloud Storage at `app/interview-state.json`
+- Audio is uploaded directly as WebM/M4A (no local `ffmpeg` on Netlify)
+- Saving runs in the background after upload so longer transcriptions can finish
+
+Do not commit `.tools/`, `.secrets/`, or `.env`.
 
 ## Flow
 
 1. The app creates a default interview thread with five foundational questions.
 2. The user records up to five minutes of audio.
 3. The user can play back or re-record before saving.
-4. The server converts the recording to MP3.
-5. The MP3 uploads to Google Cloud Storage and a signed URL is stored.
-6. OpenAI transcribes the MP3.
-7. The transcript, biography, and conversation tree are sent to the OpenAI Responses API.
-8. One follow-up question is saved as a child of the answered question.
+4. The server uploads the recording to Google Cloud Storage.
+5. OpenAI transcribes the audio.
+6. The transcript, biography, and conversation tree are sent to the OpenAI Responses API.
+7. One follow-up question is saved as a child of the answered question.

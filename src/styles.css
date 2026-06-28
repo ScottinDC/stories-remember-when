@@ -9,42 +9,36 @@
 body {
   margin: 0;
   min-width: 320px;
+  background: #f4efe4;
+  color: #2a2118;
 }
 
-button,
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-linen-200 bg-linen-50 shadow-panel;
+  }
+
+  .btn {
+    @apply inline-flex min-h-[3.25rem] items-center justify-center gap-3 rounded-xl px-5 text-lg font-semibold transition;
+  }
+
+  .btn-primary {
+    @apply btn bg-umber text-linen-50 hover:bg-umber-dark disabled:cursor-wait disabled:opacity-70;
+  }
+
+  .btn-secondary {
+    @apply btn border border-linen-300 bg-linen-50 text-ink hover:bg-umber-soft;
+  }
+
+  .btn-danger {
+    @apply btn bg-[#8B3A3A] text-linen-50 hover:bg-[#742F2F];
+  }
+
+  .label {
+    @apply text-sm font-semibold uppercase tracking-wide text-ink-faint;
+  }
+}
+
 audio {
-  border-radius: 0;
-}
-
-.large-button {
-  align-items: center;
-  border: 2px solid transparent;
-  display: inline-flex;
-  font-size: 1.5rem;
-  font-weight: 800;
-  gap: 0.85rem;
-  justify-content: center;
-  min-height: 5.5rem;
-  padding: 1.25rem 1.5rem;
-}
-
-.large-button:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
-.large-button.primary {
-  background: #0f766e;
-  color: #ffffff;
-}
-
-.large-button.secondary {
-  background: #ffffff;
-  border-color: #a8a29e;
-  color: #1c1917;
-}
-
-.large-button.danger {
-  background: #b91c1c;
-  color: #ffffff;
+  @apply w-full rounded-xl;
 }
