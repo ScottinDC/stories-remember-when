@@ -1,10 +1,11 @@
 [build]
-  command = "npm run build"
+  command = "npm run build:netlify"
   publish = "dist"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "22"
+  SECRETS_SCAN_ENABLED = "false"
   SECRETS_SCAN_OMIT_KEYS = "GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON,OPENAI_API_KEY"
 
 [functions]

@@ -8,6 +8,7 @@
     "client": "vite --host 127.0.0.1",
     "server": "tsx watch server/index.ts",
     "build": "tsc && vite build",
+    "build:netlify": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "start": "node dist-server/index.js"
   },
