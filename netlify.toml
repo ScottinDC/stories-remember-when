@@ -5,6 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  SECRETS_SCAN_OMIT_KEYS = "GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON,OPENAI_API_KEY"
 
 [functions]
   node_bundler = "esbuild"
