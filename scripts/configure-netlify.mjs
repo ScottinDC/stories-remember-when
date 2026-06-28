@@ -4,8 +4,7 @@ import { join } from "node:path";
 
 const configPath = join(homedir(), "Library/Preferences/netlify/config.json");
 const netlifyConfig = JSON.parse(readFileSync(configPath, "utf8"));
-const user = Object.values(netlifyConfig.users)[0];
-const token = user.auth.token;
+const token = Object.values(netlifyConfig.users)[0].auth.token;
 
 const serviceAccountPath = join(process.cwd(), ".secrets/remember-when-uploader.json");
 const serviceAccountJson = readFileSync(serviceAccountPath, "utf8");
@@ -73,6 +72,29 @@ async function netlifyRequest(path, options = {}) {
   return body;
 }
 
+async function upsertEnvVar(accountId, siteId, key, value) {
+  const isSecret = key.includes("KEY") || key.includes("JSON") || key.includes("SECRET");
+  const payload = {
+    key,
+    scopes: isSecret ? ["builds", "functions", "runtime"] : scopes,
+    is_secret: isSecret,
+    values: buildValues(value)
+  };
+
+  const existing = await netlifyRequest(`/api/v1/accounts/${accountId}/env/${encodeURIComponent(key)}?site_id=${siteId}`).catch(() => null);
+  if (existing) {
+    await netlifyRequest(`/api/v1/accounts/${accountId}/env/${encodeURIComponent(key)}?site_id=${siteId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+  } else {
+    await netlifyRequest(`/api/v1/accounts/${accountId}/env?site_id=${siteId}`, {
+      method: "POST",
+      body: JSON.stringify([payload])
+    });
+  }
+}
+
 async function main() {
   const sites = await netlifyRequest("/api/v1/sites");
   const site =
@@ -99,23 +121,9 @@ async function main() {
     delete envVars.OPENAI_API_KEY;
   }
 
-  const payload = Object.entries(envVars).map(([key, value]) => {
-    const isSecret = key.includes("KEY") || key.includes("JSON") || key.includes("SECRET");
-    return {
-      key,
-      scopes: isSecret ? ["builds", "functions", "runtime"] : scopes,
-      is_secret: isSecret,
-      values: buildValues(value)
-    };
-  });
-
-  await netlifyRequest(`/api/v1/accounts/${accountId}/env?site_id=${siteId}`, {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-
-  for (const entry of payload) {
-    console.log(`Set ${entry.key}`);
+  for (const [key, value] of Object.entries(envVars)) {
+    await upsertEnvVar(accountId, siteId, key, value);
+    console.log(`Set ${key}`);
   }
 
   const deploy = await netlifyRequest(`/api/v1/sites/${siteId}/deploys`, {
