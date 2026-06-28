@@ -1,3 +1,4 @@
+import * as gcsStore from "./store-gcs";
 import type { InterviewState, MemoryNode } from "./types";
 
 function useGcsStore() {
@@ -6,7 +7,7 @@ function useGcsStore() {
 
 async function store() {
   if (useGcsStore()) {
-    return import("./store-gcs");
+    return gcsStore;
   }
   return import("./store-sqlite");
 }
