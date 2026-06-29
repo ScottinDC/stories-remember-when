@@ -2,6 +2,22 @@ import { getBucketName, getStorageClient } from "./gcs-client";
 import { seriesPrefix } from "./tree";
 import type { AnswerManifest, MemoryNode } from "./types";
 
+const GCS_OPERATION_TIMEOUT_MS = 20_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out.`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> {
   let storage;
   try {
@@ -14,7 +30,7 @@ export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> 
   const file = storage.bucket(getBucketName()).file(objectName);
 
   try {
-    const [contents] = await file.download();
+    const [contents] = await withTimeout(file.download(), GCS_OPERATION_TIMEOUT_MS, "Cloud storage read");
     return JSON.parse(contents.toString("utf8")) as T;
   } catch (error) {
     const code = typeof error === "object" && error && "code" in error ? String(error.code) : undefined;

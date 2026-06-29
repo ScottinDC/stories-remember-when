@@ -1,4 +1,7 @@
+import { createLocalJWKSet, jwtVerify, type JSONWebKeySet } from "jose";
 import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
+
+let cachedJwks: ReturnType<typeof createLocalJWKSet> | null = null;
 
 export function isAuthDisabled() {
   if (isNetlifyRuntime()) {
@@ -43,41 +46,64 @@ export function extractBearerToken(headerValue: string | null | undefined) {
   return token || null;
 }
 
-async function fetchIdentityUser(token: string, requestUrl?: string) {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function getIdentityJwks(siteUrl: string) {
+  if (cachedJwks) {
+    return cachedJwks;
+  }
+
+  const response = await fetchWithTimeout(
+    `${siteUrl}/.netlify/identity/.well-known/jwks.json`,
+    {
+      headers: {
+        Accept: "application/json"
+      }
+    },
+    5000
+  );
+
+  if (!response.ok) {
+    throw new Error("Could not load identity public keys.");
+  }
+
+  const jwks = (await response.json()) as JSONWebKeySet;
+  cachedJwks = createLocalJWKSet(jwks);
+  return cachedJwks;
+}
+
+async function verifyIdentityToken(token: string, siteUrl: string) {
+  const jwks = await getIdentityJwks(siteUrl);
+  const issuer = `${siteUrl}/.netlify/identity`;
+
+  const { payload } = await jwtVerify(token, jwks, {
+    issuer,
+    clockTolerance: 30
+  });
+
+  const email = typeof payload.email === "string" ? payload.email : null;
+  if (!email) {
+    throw new Error("Token is missing an email claim.");
+  }
+
+  return email;
+}
+
+export async function verifyAccessToken(token: string, requestUrl?: string) {
   const siteUrl = resolveSiteUrl(requestUrl);
   if (!siteUrl) {
     throw new Error("Could not resolve site URL for auth verification.");
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  let response: Response;
-  try {
-    response = await fetch(`${siteUrl}/.netlify/identity/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json"
-      },
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    throw new Error("Invalid or expired sign-in.");
-  }
-
-  const user = (await response.json()) as { email?: string };
-  if (!user.email) {
-    throw new Error("Token is missing an email claim.");
-  }
-
-  return user.email;
-}
-
-export async function verifyAccessToken(token: string, requestUrl?: string) {
-  const email = await fetchIdentityUser(token, requestUrl);
+  const email = await verifyIdentityToken(token, siteUrl);
 
   if (!isEmailAllowed(email)) {
     throw new Error("This account is not authorized to access Remember When.");
