@@ -1,4 +1,24 @@
+import { decodeJwt } from "jose";
 import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
+
+type NetlifyIdentityContext = {
+  token?: string;
+  user?: {
+    email?: string;
+    exp?: number;
+  };
+};
+
+type NetlifyGlobals = {
+  netlifyIdentityContext?: NetlifyIdentityContext;
+  Netlify?: {
+    context?: {
+      cookies?: {
+        get?: (name: string) => string | undefined;
+      };
+    };
+  };
+};
 
 export function isAuthDisabled() {
   if (isNetlifyRuntime()) {
@@ -31,48 +51,113 @@ export function extractBearerToken(headerValue: string | null | undefined) {
   return token || null;
 }
 
-async function resolveAuthenticatedEmail(): Promise<string> {
-  if (isNetlifyRuntime()) {
-    const { getUser } = await import("@netlify/identity");
-    const user = await getUser();
-    if (!user?.email) {
-      throw new Error("Sign in required.");
-    }
-    return user.email;
+function getNetlifyIdentityContext(): NetlifyIdentityContext | null {
+  const context = (globalThis as NetlifyGlobals).netlifyIdentityContext;
+  return context ?? null;
+}
+
+function readCookieHeader(cookieHeader: string | null | undefined, name: string) {
+  if (!cookieHeader) {
+    return null;
   }
 
-  throw new Error("Sign in required.");
+  const match = new RegExp(`(?:^|;\\s*)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=([^;]*)`).exec(cookieHeader);
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function readServerJwt(req?: Request) {
+  const identityContext = getNetlifyIdentityContext();
+  if (identityContext?.token) {
+    return identityContext.token;
+  }
+
+  const netlifyCookies = (globalThis as NetlifyGlobals).Netlify?.context?.cookies;
+  const fromRuntime = netlifyCookies?.get?.("nf_jwt");
+  if (fromRuntime) {
+    return fromRuntime;
+  }
+
+  const bearer = extractBearerToken(req?.headers.get("authorization"));
+  if (bearer) {
+    return bearer;
+  }
+
+  return readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
+}
+
+function emailFromJwt(token: string) {
+  let payload: ReturnType<typeof decodeJwt>;
+  try {
+    payload = decodeJwt(token);
+  } catch {
+    throw new Error("Invalid or expired sign-in.");
+  }
+
+  const email = typeof payload.email === "string" ? payload.email : null;
+  if (!email) {
+    throw new Error("Token is missing an email claim.");
+  }
+
+  const exp = typeof payload.exp === "number" ? payload.exp : null;
+  if (exp && exp < Math.floor(Date.now() / 1000)) {
+    throw new Error("Invalid or expired sign-in.");
+  }
+
+  return email;
+}
+
+function resolveAuthenticatedEmail(req?: Request): string {
+  const identityContext = getNetlifyIdentityContext();
+  if (identityContext?.user?.email) {
+    const exp = identityContext.user.exp;
+    if (exp && exp < Math.floor(Date.now() / 1000)) {
+      throw new Error("Invalid or expired sign-in.");
+    }
+    return identityContext.user.email;
+  }
+
+  const token = readServerJwt(req);
+  if (!token) {
+    throw new Error("Sign in required.");
+  }
+
+  return emailFromJwt(token);
 }
 
 export type AuthResult =
   | { email: string }
   | { status: 401 | 403; error: string };
 
-export async function requireAuth(authHeader: string | null | undefined, _requestUrl?: string): Promise<AuthResult> {
+export async function requireAuth(
+  authHeader: string | null | undefined,
+  _requestUrl?: string,
+  req?: Request
+): Promise<AuthResult> {
   if (isAuthDisabled()) {
     return { email: "local-dev@remember-when.local" };
   }
 
-  if (isNetlifyRuntime()) {
-    try {
-      const email = await resolveAuthenticatedEmail();
-      if (!isEmailAllowed(email)) {
-        return { status: 403, error: "This account is not authorized to access Remember When." };
-      }
-      return { email };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Invalid or expired sign-in.";
-      const status = message.includes("not authorized") ? 403 : 401;
-      return { status, error: message };
+  try {
+    const email = req
+      ? resolveAuthenticatedEmail(req)
+      : emailFromJwt(extractBearerToken(authHeader) ?? (() => { throw new Error("Sign in required."); })());
+    if (!isEmailAllowed(email)) {
+      return { status: 403, error: "This account is not authorized to access Remember When." };
     }
+    return { email };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid or expired sign-in.";
+    const status = message.includes("not authorized") ? 403 : 401;
+    return { status, error: message };
   }
-
-  const token = extractBearerToken(authHeader);
-  if (!token) {
-    return { status: 401, error: "Sign in required." };
-  }
-
-  return { status: 401, error: "Sign in required." };
 }
 
 export function authConfig() {

@@ -13,10 +13,13 @@ export type AuthConfig = {
 
 export type AuthConfigStatus = "loading" | "loaded" | "failed";
 
-function storeAccessToken(token: string) {
+function storeAccessToken(token: string, refreshToken?: string | null) {
   sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `nf_jwt=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
+  if (refreshToken) {
+    document.cookie = `nf_refresh=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax${secure}`;
+  }
 }
 
 function readHashToken() {
@@ -32,7 +35,7 @@ function readHashToken() {
   }
 
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  storeAccessToken(token);
+  storeAccessToken(token, params.get("refresh_token"));
   return token;
 }
 
@@ -52,6 +55,7 @@ export function getStoredAccessToken() {
 export function clearStoredAccessToken() {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
   document.cookie = "nf_jwt=; Path=/; Max-Age=0";
+  document.cookie = "nf_refresh=; Path=/; Max-Age=0";
 }
 
 export function loginWithGoogle() {
