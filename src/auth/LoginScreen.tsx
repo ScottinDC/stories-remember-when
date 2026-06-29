@@ -1,4 +1,5 @@
 import { Loader2, LogOut } from "lucide-react";
+import { hasOAuthReturnInUrl } from "./identity";
 import { useAuth } from "./AuthProvider";
 
 export function LoginScreen() {
@@ -87,13 +88,14 @@ export function LoginScreen() {
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { authRequired, loading, user } = useAuth();
   const mustSignIn = import.meta.env.PROD || authRequired;
+  const finishingOAuth = hasOAuthReturnInUrl();
 
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center">
         <div className="flex items-center gap-3 font-mono text-sm text-ink-muted">
           <Loader2 className="h-5 w-5 animate-spin text-navy-light" />
-          Checking access
+          {finishingOAuth ? "Finishing Google sign-in" : "Checking access"}
         </div>
       </main>
     );

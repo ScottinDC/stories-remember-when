@@ -1,11 +1,8 @@
-import {
-  handleAuthCallback,
-  hydrateSession,
-  logout as identityLogout,
-  oauthLogin
-} from "@netlify/identity";
+import { hydrateSession, logout as identityLogout } from "@netlify/identity";
 
 const TOKEN_STORAGE_KEY = "remember-when.auth-token";
+const OAUTH_RETURN_KEY = "remember-when.oauth-return";
+const OAUTH_ERROR_KEY = "remember-when.oauth-error";
 
 export type AuthUser = {
   email: string;
@@ -81,6 +78,104 @@ function syncStoredAccessToken(token: string | null | undefined) {
   return token;
 }
 
+function storeOAuthTokens(accessToken: string, refreshToken?: string | null) {
+  syncStoredAccessToken(accessToken);
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `nf_jwt=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax${secure}`;
+  if (refreshToken) {
+    document.cookie = `nf_refresh=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax${secure}`;
+  }
+}
+
+function readOAuthReturnParams() {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (hash) {
+    return new URLSearchParams(hash);
+  }
+
+  const query = window.location.search.replace(/^\?/, "");
+  if (query) {
+    return new URLSearchParams(query);
+  }
+
+  return null;
+}
+
+function clearOAuthReturnFromUrl() {
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState(null, "", cleanUrl);
+}
+
+export function readOAuthReturnError() {
+  const stored = sessionStorage.getItem(OAUTH_ERROR_KEY);
+  if (stored) {
+    sessionStorage.removeItem(OAUTH_ERROR_KEY);
+    return stored;
+  }
+
+  const params = readOAuthReturnParams();
+  if (!params) {
+    return null;
+  }
+
+  const error = params.get("error");
+  if (!error) {
+    return null;
+  }
+
+  const description = params.get("error_description");
+  return description?.replace(/\+/g, " ") ?? error.replace(/_/g, " ");
+}
+
+function captureOAuthReturnFromUrl() {
+  const params = readOAuthReturnParams();
+  if (!params) {
+    return null;
+  }
+
+  const oauthError = readOAuthReturnError();
+  if (oauthError) {
+    sessionStorage.setItem(OAUTH_ERROR_KEY, oauthError);
+    clearOAuthReturnFromUrl();
+    return null;
+  }
+
+  const accessToken = params.get("access_token");
+  if (!accessToken) {
+    return null;
+  }
+
+  storeOAuthTokens(accessToken, params.get("refresh_token"));
+  sessionStorage.setItem(OAUTH_RETURN_KEY, "1");
+  clearOAuthReturnFromUrl();
+  return accessToken;
+}
+
+export function hasOAuthReturnInUrl() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (sessionStorage.getItem(OAUTH_RETURN_KEY)) {
+    return true;
+  }
+
+  const params = readOAuthReturnParams();
+  if (!params) {
+    return false;
+  }
+
+  return params.has("access_token") || params.has("error");
+}
+
+export function clearOAuthReturnFlag() {
+  sessionStorage.removeItem(OAUTH_RETURN_KEY);
+}
+
+if (typeof window !== "undefined") {
+  captureOAuthReturnFromUrl();
+}
+
 export function userFromAccessToken(token: string): AuthUser | null {
   const claims = decodeAccessTokenClaims(token);
   const email = emailFromClaims(claims);
@@ -93,33 +188,10 @@ export function userFromAccessToken(token: string): AuthUser | null {
   return { email };
 }
 
-function readLegacyHashToken() {
-  const hash = window.location.hash.replace(/^#/, "");
-  if (!hash) {
-    return null;
-  }
-
-  const params = new URLSearchParams(hash);
-  const token = params.get("access_token");
-  if (!token) {
-    return null;
-  }
-
-  window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  syncStoredAccessToken(token);
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `nf_jwt=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
-  const refreshToken = params.get("refresh_token");
-  if (refreshToken) {
-    document.cookie = `nf_refresh=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax${secure}`;
-  }
-  return token;
-}
-
 export function getStoredAccessToken() {
-  const fromHash = readLegacyHashToken();
-  if (fromHash) {
-    return fromHash;
+  const captured = captureOAuthReturnFromUrl();
+  if (captured) {
+    return captured;
   }
 
   const stored = sessionStorage.getItem(TOKEN_STORAGE_KEY);
@@ -141,54 +213,51 @@ export function hasStoredSession() {
 
 export function clearStoredAccessToken() {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(OAUTH_RETURN_KEY);
+  sessionStorage.removeItem(OAUTH_ERROR_KEY);
   document.cookie = "nf_jwt=; Path=/; Max-Age=0; SameSite=Lax";
   document.cookie = "nf_refresh=; Path=/; Max-Age=0; SameSite=Lax";
 }
 
 export async function resolveAuthUser(): Promise<AuthUser | null> {
-  if (import.meta.env.DEV) {
-    const token = getStoredAccessToken();
-    return token ? userFromAccessToken(token) : null;
+  const oauthError = readOAuthReturnError();
+  if (oauthError) {
+    throw new Error(oauthError);
   }
 
-  try {
-    const callback = await handleAuthCallback();
-    if (callback?.user?.email) {
-      const token = readCookieToken("nf_jwt");
-      syncStoredAccessToken(token);
-      return { email: callback.user.email };
+  const token = getStoredAccessToken();
+  if (token) {
+    const user = userFromAccessToken(token);
+    if (user) {
+      return user;
     }
-  } catch {
-    // Not an OAuth callback URL.
+    clearStoredAccessToken();
+  }
+
+  if (import.meta.env.DEV) {
+    return null;
   }
 
   try {
     const hydrated = await hydrateSession();
     if (hydrated?.email) {
-      const token = readCookieToken("nf_jwt");
-      syncStoredAccessToken(token);
+      syncStoredAccessToken(readCookieToken("nf_jwt"));
       return { email: hydrated.email };
     }
   } catch {
     // Fall back to locally stored token.
   }
 
-  const token = getStoredAccessToken();
-  return token ? userFromAccessToken(token) : null;
+  return null;
 }
 
 export function loginWithGoogle() {
-  if (import.meta.env.DEV) {
-    const redirectUri = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-    const params = new URLSearchParams({
-      provider: "google",
-      redirect_uri: redirectUri
-    });
-    window.location.assign(`/.netlify/identity/authorize?${params.toString()}`);
-    return;
-  }
-
-  oauthLogin("google");
+  const redirectUri = `${window.location.origin}/`;
+  const params = new URLSearchParams({
+    provider: "google",
+    redirect_uri: redirectUri
+  });
+  window.location.assign(`/.netlify/identity/authorize?${params.toString()}`);
 }
 
 export async function fetchAuthConfig() {

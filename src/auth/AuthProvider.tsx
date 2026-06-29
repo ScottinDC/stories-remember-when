@@ -1,8 +1,10 @@
 import React from "react";
 import {
   clearStoredAccessToken,
+  clearOAuthReturnFlag,
   fetchAuthConfig,
   getStoredAccessToken,
+  hasOAuthReturnInUrl,
   loginWithGoogle,
   logoutIdentity,
   resolveAuthUser,
@@ -43,8 +45,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setConfigStatus("loading");
 
+    const finishingOAuth = hasOAuthReturnInUrl();
+
     try {
-      const authConfig = await fetchAuthConfig();
+      let authConfig: AuthConfig;
+      let currentUser: AuthUser | null;
+
+      if (finishingOAuth) {
+        getStoredAccessToken();
+        currentUser = await resolveAuthUser();
+        authConfig = await fetchAuthConfig();
+      } else {
+        authConfig = await fetchAuthConfig();
+        currentUser = await resolveAuthUser();
+      }
+
       setConfig(authConfig);
       setConfigStatus("loaded");
 
@@ -58,7 +73,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const currentUser = await resolveAuthUser();
       if (!currentUser) {
         clearStoredAccessToken();
         setUser(null);
@@ -80,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(message);
       }
     } finally {
+      clearOAuthReturnFlag();
       setLoading(false);
     }
   }, []);
