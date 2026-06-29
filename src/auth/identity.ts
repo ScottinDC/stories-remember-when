@@ -13,6 +13,41 @@ export type AuthConfig = {
 
 export type AuthConfigStatus = "loading" | "loaded" | "failed";
 
+type AccessTokenClaims = {
+  email?: string;
+  exp?: number;
+  user_metadata?: {
+    email?: string;
+  };
+};
+
+function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return null;
+    }
+    const payload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payload) as AccessTokenClaims;
+  } catch {
+    return null;
+  }
+}
+
+export function userFromAccessToken(token: string): AuthUser | null {
+  const claims = decodeAccessTokenClaims(token);
+  const email =
+    claims?.email ??
+    (typeof claims?.user_metadata?.email === "string" ? claims.user_metadata.email : undefined);
+  if (!email) {
+    return null;
+  }
+  if (claims?.exp && claims.exp < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+  return { email };
+}
+
 function storeAccessToken(token: string, refreshToken?: string | null) {
   sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
@@ -52,10 +87,14 @@ export function getStoredAccessToken() {
   return stored;
 }
 
+export function hasStoredSession() {
+  return Boolean(getStoredAccessToken());
+}
+
 export function clearStoredAccessToken() {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-  document.cookie = "nf_jwt=; Path=/; Max-Age=0";
-  document.cookie = "nf_refresh=; Path=/; Max-Age=0";
+  document.cookie = "nf_jwt=; Path=/; Max-Age=0; SameSite=Lax";
+  document.cookie = "nf_refresh=; Path=/; Max-Age=0; SameSite=Lax";
 }
 
 export function loginWithGoogle() {
@@ -80,25 +119,6 @@ export async function fetchAuthConfig() {
     allowlistCount: typeof payload.allowlistCount === "number" ? payload.allowlistCount : undefined,
     hasAllowedEmailsKey: Boolean(payload.hasAllowedEmailsKey)
   };
-}
-
-export async function fetchCurrentUser(token: string) {
-  const response = await fetch("/.netlify/identity/user", {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json()) as { email?: string };
-  if (!payload.email) {
-    return null;
-  }
-
-  return { email: payload.email };
 }
 
 export async function logoutIdentity() {

@@ -20,7 +20,7 @@ export function App() {
       .then(setState)
       .catch(async (err: unknown) => {
         if (err instanceof ApiAuthError) {
-          await logout();
+          await logout({ error: err.message });
           return;
         }
         setError(err instanceof Error ? err.message : "Could not load the interview.");
@@ -42,7 +42,12 @@ export function App() {
   if (!state) {
     return (
       <main className="grid min-h-screen place-items-center px-4">
-        <p className="text-base text-[#9b2c2c]">{error ?? "Could not load the interview."}</p>
+        <div className="flex max-w-md flex-col items-center gap-4 text-center">
+          <p className="text-base text-[#9b2c2c]">{error ?? "Could not load the interview."}</p>
+          <button className="btn-secondary" onClick={() => void logout({ error: null })} type="button">
+            Sign out and try again
+          </button>
+        </div>
       </main>
     );
   }

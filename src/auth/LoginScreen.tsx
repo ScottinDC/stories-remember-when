@@ -2,7 +2,9 @@ import { Loader2, LogOut } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 
 export function LoginScreen() {
-  const { authConfigured, configStatus, error, hasAllowedEmailsKey, loginWithGoogle } = useAuth();
+  const { authConfigured, configStatus, error, getAccessToken, hasAllowedEmailsKey, loginWithGoogle, logout } =
+    useAuth();
+  const hasSession = Boolean(getAccessToken());
 
   return (
     <main className="grid min-h-screen place-items-center px-5">
@@ -52,6 +54,17 @@ export function LoginScreen() {
               "Continue with Google"
             )}
           </button>
+
+          {hasSession ? (
+            <button
+              className="btn-secondary w-full justify-center"
+              onClick={() => void logout({ error: null })}
+              type="button"
+            >
+              <LogOut className="h-4 w-4" />
+              Clear session and try again
+            </button>
+          ) : null}
         </div>
       </div>
     </main>

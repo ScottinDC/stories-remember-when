@@ -101,7 +101,12 @@ function emailFromJwt(token: string) {
     throw new Error("Invalid or expired sign-in.");
   }
 
-  const email = typeof payload.email === "string" ? payload.email : null;
+  const email =
+    typeof payload.email === "string"
+      ? payload.email
+      : typeof (payload as { user_metadata?: { email?: string } }).user_metadata?.email === "string"
+        ? (payload as { user_metadata: { email: string } }).user_metadata.email
+        : null;
   if (!email) {
     throw new Error("Token is missing an email claim.");
   }
@@ -150,7 +155,10 @@ export async function requireAuth(
       ? resolveAuthenticatedEmail(req)
       : emailFromJwt(extractBearerToken(authHeader) ?? (() => { throw new Error("Sign in required."); })());
     if (!isEmailAllowed(email)) {
-      return { status: 403, error: "This account is not authorized to access Remember When." };
+      return {
+        status: 403,
+        error: `This Google account (${email}) is not on the approved family list. Ask the site owner to add it to ALLOWED_EMAILS in Netlify.`
+      };
     }
     return { email };
   } catch (error) {

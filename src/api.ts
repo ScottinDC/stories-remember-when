@@ -64,6 +64,9 @@ export async function fetchInterview() {
   const response = await apiFetch("/api/interview");
   if (!response.ok) {
     const body = await response.text();
+    if (/Internal Error/i.test(body)) {
+      throw new Error("The server had trouble loading the interview. Use “Clear session and try again” on the sign-in screen.");
+    }
     let message: string | undefined;
     try {
       const error = JSON.parse(body) as { error?: string };

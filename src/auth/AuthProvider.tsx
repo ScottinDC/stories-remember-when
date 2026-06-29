@@ -2,10 +2,10 @@ import React from "react";
 import {
   clearStoredAccessToken,
   fetchAuthConfig,
-  fetchCurrentUser,
   getStoredAccessToken,
   loginWithGoogle,
   logoutIdentity,
+  userFromAccessToken,
   type AuthConfig,
   type AuthConfigStatus,
   type AuthUser
@@ -20,7 +20,7 @@ type AuthContextValue = {
   configStatus: AuthConfigStatus;
   error: string | null;
   loginWithGoogle: () => void;
-  logout: () => Promise<void>;
+  logout: (options?: { error?: string | null }) => Promise<void>;
   getAccessToken: () => string | null;
 };
 
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const currentUser = await fetchCurrentUser(token);
+      const currentUser = userFromAccessToken(token);
       if (!currentUser) {
         clearStoredAccessToken();
         setUser(null);
@@ -94,10 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void bootstrap();
   }, [bootstrap]);
 
-  const logout = React.useCallback(async () => {
+  const logout = React.useCallback(async (options?: { error?: string | null }) => {
     await logoutIdentity();
     setUser(null);
-    setError(null);
+    setError(options?.error ?? null);
   }, []);
 
   const value = React.useMemo<AuthContextValue>(
