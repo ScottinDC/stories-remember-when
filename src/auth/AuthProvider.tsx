@@ -21,6 +21,7 @@ type AuthContextValue = {
   error: string | null;
   loginWithGoogle: () => void;
   logout: (options?: { error?: string | null }) => Promise<void>;
+  retryBootstrap: () => Promise<void>;
   getAccessToken: () => string | null;
 };
 
@@ -111,9 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       error,
       loginWithGoogle,
       logout,
+      retryBootstrap: bootstrap,
       getAccessToken: getStoredAccessToken
     }),
-    [config.authConfigured, config.authRequired, config.hasAllowedEmailsKey, configStatus, error, loading, logout, user]
+    [bootstrap, config.authConfigured, config.authRequired, config.hasAllowedEmailsKey, configStatus, error, loading, logout, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

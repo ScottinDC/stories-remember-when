@@ -2,8 +2,16 @@ import { Loader2, LogOut } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 
 export function LoginScreen() {
-  const { authConfigured, configStatus, error, getAccessToken, hasAllowedEmailsKey, loginWithGoogle, logout } =
-    useAuth();
+  const {
+    authConfigured,
+    configStatus,
+    error,
+    getAccessToken,
+    hasAllowedEmailsKey,
+    loginWithGoogle,
+    logout,
+    retryBootstrap
+  } = useAuth();
   const hasSession = Boolean(getAccessToken());
 
   return (
@@ -22,10 +30,15 @@ export function LoginScreen() {
           </p>
 
           {configStatus === "failed" ? (
-            <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
-              {import.meta.env.DEV
-                ? "Could not reach the local API on port 8787. Run npm run dev:local from the project folder."
-                : "Could not reach the server to verify access control. Check your connection and try again, or redeploy after updating Netlify environment variables."}
+            <div className="space-y-3 rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
+              <p>
+                {import.meta.env.DEV
+                  ? "Could not reach the local API on port 8787. Run npm run dev:local from the project folder."
+                  : "Could not reach the server to verify access control. Check your connection and try again."}
+              </p>
+              <button className="btn-secondary w-full justify-center" onClick={() => void retryBootstrap()} type="button">
+                Try again
+              </button>
             </div>
           ) : !authConfigured ? (
             <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">

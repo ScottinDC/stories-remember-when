@@ -1,5 +1,6 @@
 import type { Context } from "@netlify/functions";
-import { requireAuth } from "../../server/auth";
+import { authConfig, requireAuth } from "../../server/auth";
+import { storageConfig } from "../../server/runtime-env";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -22,6 +23,11 @@ export default async (req: Request, context: Context) => {
     const path = routePath(url);
 
     if (req.method === "GET" && path === "/api/health") {
+      const probeStorage = url.searchParams.get("probe") === "storage";
+      if (!probeStorage) {
+        return json({ ok: true, ...authConfig(), ...storageConfig() });
+      }
+
       const { handleHealth } = await import("../../server/handlers-read");
       return json(await handleHealth());
     }

@@ -107,18 +107,42 @@ export function loginWithGoogle() {
 }
 
 export async function fetchAuthConfig() {
-  const response = await fetch("/api/health");
-  if (!response.ok) {
-    throw new Error("Could not load auth settings.");
+  const attempts = 3;
+  let lastError: Error | null = null;
+
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      const response = await fetch("/api/health", { cache: "no-store" });
+      const contentType = response.headers.get("content-type") ?? "";
+
+      if (!response.ok) {
+        const body = await response.text();
+        if (/Internal Error/i.test(body)) {
+          throw new Error("The server is still starting. Please wait a moment and try again.");
+        }
+        throw new Error(`Could not load auth settings (${response.status}).`);
+      }
+
+      if (!contentType.includes("application/json")) {
+        throw new Error("The app could not reach the API. Redeploy or contact the site owner.");
+      }
+
+      const payload = (await response.json()) as AuthConfig & { ok?: boolean };
+      return {
+        authRequired: Boolean(payload.authRequired),
+        authConfigured: Boolean(payload.authConfigured),
+        allowlistCount: typeof payload.allowlistCount === "number" ? payload.allowlistCount : undefined,
+        hasAllowedEmailsKey: Boolean(payload.hasAllowedEmailsKey)
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Could not load auth settings.");
+      if (index < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 800 * (index + 1)));
+      }
+    }
   }
 
-  const payload = (await response.json()) as AuthConfig & { ok?: boolean };
-  return {
-    authRequired: Boolean(payload.authRequired),
-    authConfigured: Boolean(payload.authConfigured),
-    allowlistCount: typeof payload.allowlistCount === "number" ? payload.allowlistCount : undefined,
-    hasAllowedEmailsKey: Boolean(payload.hasAllowedEmailsKey)
-  };
+  throw lastError ?? new Error("Could not load auth settings.");
 }
 
 export async function logoutIdentity() {
