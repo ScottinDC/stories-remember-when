@@ -1,15 +1,18 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-const AUTH_DISABLED = process.env.AUTH_DISABLED === "true";
-
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
+function envVar(name: "ALLOWED_EMAILS" | "AUTH_DISABLED" | "URL") {
+  // Dynamic access so Netlify's function bundler cannot inline build-time empties.
+  return process.env[name];
+}
+
 export function isAuthDisabled() {
-  return AUTH_DISABLED;
+  return envVar("AUTH_DISABLED") === "true";
 }
 
 export function getAllowedEmails() {
-  const raw = process.env.ALLOWED_EMAILS ?? "";
+  const raw = envVar("ALLOWED_EMAILS") ?? "";
   return raw
     .split(",")
     .map((email) => email.trim().toLowerCase())
@@ -25,8 +28,9 @@ export function isEmailAllowed(email: string) {
 }
 
 function resolveSiteUrl(requestUrl?: string) {
-  if (process.env.URL) {
-    return process.env.URL.replace(/\/$/, "");
+  const siteUrl = envVar("URL");
+  if (siteUrl) {
+    return siteUrl.replace(/\/$/, "");
   }
   if (requestUrl) {
     const url = new URL(requestUrl);
@@ -111,8 +115,11 @@ export async function requireAuth(authHeader: string | null | undefined, request
 }
 
 export function authConfig() {
+  const disabled = isAuthDisabled();
+  const allowlistCount = getAllowedEmails().length;
   return {
-    authRequired: !AUTH_DISABLED,
-    authConfigured: AUTH_DISABLED || getAllowedEmails().length > 0
+    authRequired: !disabled,
+    authConfigured: disabled || allowlistCount > 0,
+    allowlistCount
   };
 }

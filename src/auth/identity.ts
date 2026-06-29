@@ -7,7 +7,10 @@ export type AuthUser = {
 export type AuthConfig = {
   authRequired: boolean;
   authConfigured: boolean;
+  allowlistCount?: number;
 };
+
+export type AuthConfigStatus = "loading" | "loaded" | "failed";
 
 function readHashToken() {
   const hash = window.location.hash.replace(/^#/, "");
@@ -52,7 +55,8 @@ export async function fetchAuthConfig() {
   const payload = (await response.json()) as AuthConfig & { ok?: boolean };
   return {
     authRequired: Boolean(payload.authRequired),
-    authConfigured: Boolean(payload.authConfigured)
+    authConfigured: Boolean(payload.authConfigured),
+    allowlistCount: typeof payload.allowlistCount === "number" ? payload.allowlistCount : undefined
   };
 }
 

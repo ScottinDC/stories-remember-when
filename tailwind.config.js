@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        page: "#f4f4f1",
+        page: "#f4f4f2",
         surface: "#ffffff",
         fill: "#fafaf8",
         navy: {

@@ -7,6 +7,7 @@ import {
   loginWithGoogle,
   logoutIdentity,
   type AuthConfig,
+  type AuthConfigStatus,
   type AuthUser
 } from "./identity";
 
@@ -15,6 +16,7 @@ type AuthContextValue = {
   loading: boolean;
   authRequired: boolean;
   authConfigured: boolean;
+  configStatus: AuthConfigStatus;
   error: string | null;
   loginWithGoogle: () => void;
   logout: () => Promise<void>;
@@ -31,14 +33,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     authRequired: true,
     authConfigured: false
   });
+  const [configStatus, setConfigStatus] = React.useState<AuthConfigStatus>("loading");
 
   const bootstrap = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    setConfigStatus("loading");
 
     try {
       const authConfig = await fetchAuthConfig();
       setConfig(authConfig);
+      setConfigStatus("loaded");
 
       if (!authConfig.authRequired) {
         setUser({ email: "local-dev@remember-when.local" });
@@ -81,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (bootstrapError) {
       const message = bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
       setUser(null);
+      setConfigStatus("failed");
       setError(message);
     } finally {
       setLoading(false);
@@ -103,12 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       authRequired: config.authRequired,
       authConfigured: config.authConfigured,
+      configStatus,
       error,
       loginWithGoogle,
       logout,
       getAccessToken: getStoredAccessToken
     }),
-    [config.authConfigured, config.authRequired, error, loading, logout, user]
+    [config.authConfigured, config.authRequired, configStatus, error, loading, logout, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

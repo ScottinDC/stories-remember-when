@@ -30,7 +30,7 @@ export function App() {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-page">
+      <main className="grid min-h-screen place-items-center">
         <div className="flex items-center gap-3 font-mono text-sm text-ink-muted">
           <Loader2 className="h-5 w-5 animate-spin text-navy-light" />
           Opening the interview
@@ -41,7 +41,7 @@ export function App() {
 
   if (!state) {
     return (
-      <main className="grid min-h-screen place-items-center bg-page px-4">
+      <main className="grid min-h-screen place-items-center px-4">
         <p className="text-base text-[#9b2c2c]">{error ?? "Could not load the interview."}</p>
       </main>
     );
@@ -50,7 +50,7 @@ export function App() {
   const nodes = state.nodes;
 
   return (
-    <main className="min-h-screen bg-page px-5 py-8 md:px-6">
+    <main className="min-h-screen px-5 py-8 md:px-6">
       <div className="mx-auto flex w-full max-w-shell flex-col gap-7">
         <AuthStatus />
         <AppHeader

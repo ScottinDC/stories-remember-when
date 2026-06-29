@@ -2,10 +2,10 @@ import { Loader2, LogOut } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 
 export function LoginScreen() {
-  const { authConfigured, error, loginWithGoogle } = useAuth();
+  const { authConfigured, configStatus, error, loginWithGoogle } = useAuth();
 
   return (
-    <main className="grid min-h-screen place-items-center bg-page px-5">
+    <main className="grid min-h-screen place-items-center px-5">
       <div className="form-card w-full max-w-md">
         <div className="card-header px-5">
           <div>
@@ -19,10 +19,15 @@ export function LoginScreen() {
             Sign in with Google to continue. Only pre-approved family accounts can access this interview.
           </p>
 
-          {!authConfigured ? (
+          {configStatus === "failed" ? (
+            <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
+              Could not reach the server to verify access control. Check your connection and try again, or redeploy
+              after updating Netlify environment variables.
+            </div>
+          ) : !authConfigured ? (
             <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
               Access control is not configured yet. Add <code className="font-mono text-xs">ALLOWED_EMAILS</code> in
-              Netlify environment variables.
+              Netlify environment variables, then trigger a new deploy.
             </div>
           ) : null}
 
@@ -30,7 +35,12 @@ export function LoginScreen() {
             <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">{error}</div>
           ) : null}
 
-          <button className="btn-primary" disabled={!authConfigured} onClick={loginWithGoogle} type="button">
+          <button
+            className="btn-primary"
+            disabled={configStatus !== "loaded" || !authConfigured}
+            onClick={loginWithGoogle}
+            type="button"
+          >
             Continue with Google
           </button>
         </div>
@@ -44,7 +54,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-page">
+      <main className="grid min-h-screen place-items-center">
         <div className="flex items-center gap-3 font-mono text-sm text-ink-muted">
           <Loader2 className="h-5 w-5 animate-spin text-navy-light" />
           Checking access
