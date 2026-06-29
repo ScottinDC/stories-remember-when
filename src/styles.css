@@ -12,8 +12,8 @@ body {
   background: #f4f4f1;
   color: #1a1714;
   font-family: "Open Sans", ui-sans-serif, system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -24,27 +24,27 @@ body {
 
 @layer components {
   .form-card {
-    @apply rounded border border-line bg-surface shadow-card;
+    @apply rounded border border-line/80 bg-surface shadow-card;
   }
 
   .panel-title {
-    @apply font-serif text-[21px] font-medium text-ink;
+    @apply font-serif text-lg font-medium tracking-tight text-ink;
   }
 
   .panel-subtitle {
-    @apply font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint;
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink-faint;
   }
 
   .btn {
-    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2.5 rounded px-4 text-sm font-medium transition-colors;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded px-3.5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply btn w-full bg-navy font-mono text-xs font-medium uppercase tracking-[0.18em] text-white hover:bg-navy-light disabled:cursor-wait disabled:opacity-60;
+    @apply btn w-full bg-navy font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-white hover:bg-navy-light disabled:cursor-wait disabled:opacity-60;
   }
 
   .btn-secondary {
-    @apply btn border border-line bg-fill text-ink-secondary hover:bg-page;
+    @apply btn border border-line/80 bg-fill text-ink-secondary hover:bg-page;
   }
 
   .btn-danger {
@@ -52,31 +52,35 @@ body {
   }
 
   .btn-icon {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded border border-line bg-fill text-ink-placeholder transition-colors hover:border-line hover:bg-page disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex h-8 w-8 items-center justify-center rounded border border-line/80 bg-surface text-ink-placeholder transition-colors hover:border-navy-light/30 hover:bg-page disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .field-label {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-navy-light;
-  }
-
-  .input-box {
-    @apply rounded border-0 bg-transparent p-0;
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-navy-light;
   }
 
   .stat-value {
-    @apply font-mono text-[40px] font-medium leading-[0.9] tracking-tight text-ink-body;
+    @apply font-mono text-[28px] font-medium leading-none tracking-tight text-ink-body tabular-nums;
   }
 
   .stat-label {
-    @apply mt-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-ink-faint;
+    @apply mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint;
   }
 
   .mono-eyebrow {
-    @apply font-mono text-[11.5px] font-medium uppercase tracking-[0.26em] text-navy-light;
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-navy-light;
+  }
+
+  .card-header {
+    @apply flex items-baseline justify-between border-b border-line-soft py-3;
+  }
+
+  .card-body {
+    @apply px-5 py-4;
   }
 }
 
 audio {
   @apply w-full rounded;
-  height: 2.25rem;
+  height: 2rem;
 }

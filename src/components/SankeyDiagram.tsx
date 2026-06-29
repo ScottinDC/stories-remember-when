@@ -197,17 +197,17 @@ export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
   }
 
   return (
-    <section className="form-card px-[34px] pb-7 pt-[30px]">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
+    <section className="form-card card-body">
+      <div className="mb-0.5 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="panel-title">Question Progression</h2>
-        <span className="panel-subtitle tracking-[0.12em]">Branching flow</span>
+        <span className="panel-subtitle">Branching flow</span>
       </div>
-      <p className="mb-[22px] text-sm leading-relaxed text-ink-muted">
+      <p className="mb-4 text-sm leading-relaxed text-ink-muted">
         Each branch is labeled with the question it leads to. The conversation deepens as one response flows into the next.
       </p>
       <div
         ref={containerRef}
-        className="min-h-[450px] w-full overflow-x-auto rounded border border-line-soft bg-fill p-3"
+        className="min-h-[400px] w-full overflow-x-auto rounded border border-line-soft/80 bg-fill p-2.5"
       >
         <svg ref={svgRef} className="block h-auto w-full" role="img" aria-label="Question tree Sankey diagram" />
       </div>

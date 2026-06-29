@@ -56,11 +56,15 @@ export function nextSequenceOrder(nodes: MemoryNode[]) {
   return max + 1;
 }
 
-export function enrichNode(nodes: MemoryNode[], node: MemoryNode): MemoryNode {
-  const depth = node.depth ?? nodeDepth(nodes, node);
+export type EnrichableMemoryNode = Omit<MemoryNode, "branchRootId" | "branchLabel"> &
+  Partial<Pick<MemoryNode, "branchRootId" | "branchLabel">>;
+
+export function enrichNode(nodes: MemoryNode[], node: EnrichableMemoryNode): MemoryNode {
+  const asNode = node as MemoryNode;
+  const depth = node.depth ?? nodeDepth(nodes, asNode);
   const generation = node.generation ?? depth;
-  const treePath = node.treePath ?? buildTreePath(nodes, node);
-  const withPath = { ...node, depth, generation, treePath };
+  const treePath = node.treePath ?? buildTreePath(nodes, asNode);
+  const withPath = { ...node, depth, generation, treePath } as MemoryNode;
   const branchRootId = node.branchRootId ?? resolveBranchRootId(nodes, withPath);
   const branchLabel = node.branchLabel ?? resolveBranchLabel(nodes, withPath, branchRootId);
   return { ...withPath, branchRootId, branchLabel };

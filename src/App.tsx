@@ -41,8 +41,8 @@ export function App() {
   const nodes = state.nodes;
 
   return (
-    <main className="min-h-screen bg-page px-8 py-[52px] pb-16">
-      <div className="mx-auto flex w-full max-w-shell flex-col gap-10">
+    <main className="min-h-screen bg-page px-5 py-8 md:px-6">
+      <div className="mx-auto flex w-full max-w-shell flex-col gap-7">
         <AppHeader
           answeredCount={countByStatus(nodes, "answered")}
           pendingCount={countByStatus(nodes, "pending")}

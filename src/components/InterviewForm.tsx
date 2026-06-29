@@ -79,13 +79,13 @@ export function InterviewForm({ state, onStateChange, setError }: InterviewFormP
   }
 
   return (
-    <div className="flex w-full flex-col gap-9">
-      <div className="grid items-start gap-9 lg:grid-cols-[minmax(0,1fr)_428px]">
+    <div className="flex w-full flex-col gap-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <QuestionSeries activeQuestionId={activeQuestionId} nodes={sorted} onSelect={setActiveQuestionId} />
 
-        <aside className="flex flex-col gap-6">
-          <section className="form-card px-7 pb-[30px] pt-7">
-            <div className="mb-[26px] flex items-center gap-0 font-mono">
+        <aside className="flex flex-col gap-4">
+          <section className="form-card card-body">
+            <div className="mb-4 flex items-center gap-0 font-mono">
               {progressSteps.map((step, index) => {
                 const stepAnswered = saved.some(
                   (node) => node.sequenceOrder === step.sequenceOrder || node.id === step.id
@@ -94,7 +94,7 @@ export function InterviewForm({ state, onStateChange, setError }: InterviewFormP
                 return (
                   <React.Fragment key={step.id}>
                     <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium tabular-nums ${
                         stepAnswered
                           ? "bg-navy text-white"
                           : isActive
@@ -112,32 +112,32 @@ export function InterviewForm({ state, onStateChange, setError }: InterviewFormP
               })}
             </div>
 
-            <div className="mb-4 flex items-baseline justify-between border-b border-line-soft pb-3.5">
+            <div className="mb-4 flex items-baseline justify-between border-b border-line-soft pb-3">
               <h2 className="panel-title">Current Question</h2>
-              <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint tabular-nums">
                 {String(foundationSaved).padStart(2, "0")} / {String(progressSteps.length).padStart(2, "0")} saved
               </span>
             </div>
 
             {current ? (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <p className="field-label mb-3">{promptLabel(current)}</p>
-                  <p className="text-[21px] font-semibold leading-snug text-ink">{current.question}</p>
+                  <p className="field-label mb-2">{promptLabel(current)}</p>
+                  <p className="text-lg font-medium leading-snug text-ink">{current.question}</p>
                 </div>
 
                 <div>
-                  <div className="mb-2 flex items-center justify-between font-mono">
-                    <span className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-[0.16em] text-ink-faint">
-                      <span className="inline-block h-[7px] w-[7px] shrink-0 rounded-full bg-record" />
-                      Recording time
+                  <div className="mb-1.5 flex items-center justify-between font-mono">
+                    <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-faint">
+                      <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-record" />
+                      Recording
                     </span>
-                    <span className="text-[13px] text-ink-secondary">
+                    <span className="text-xs tabular-nums text-ink-secondary">
                       {formatTime(recorder.seconds)}{" "}
                       <span className="text-[#b3ada3]">/ {formatTime(recorder.maxSeconds)}</span>
                     </span>
                   </div>
-                  <div className="mb-6 h-1 overflow-hidden rounded-sm bg-line-soft">
+                  <div className="mb-4 h-1 overflow-hidden rounded-sm bg-line-soft">
                     <div className="h-full bg-navy transition-all" style={{ width: `${progress}%` }} />
                   </div>
                 </div>

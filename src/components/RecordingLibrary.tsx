@@ -56,11 +56,11 @@ function RecordingRow({
   const canPlay = Boolean(node.mp3Url && node.status === "answered");
 
   return (
-    <article className="border-t border-line-soft py-4 first:border-t-0 first:pt-0">
-      <div className="mb-2 flex items-start justify-between gap-3">
+    <article className="border-t border-line-soft/80 py-3 first:border-t-0 first:pt-0">
+      <div className="mb-1.5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">{branchCaption(node)}</p>
-          <h3 className="mt-1 text-sm font-medium leading-snug text-ink">{node.question}</h3>
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint">{branchCaption(node)}</p>
+          <h3 className="mt-0.5 text-sm font-medium leading-snug text-ink">{node.question}</h3>
         </div>
         {node.status === "processing" ? (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-navy-light" aria-hidden="true" />
@@ -68,7 +68,7 @@ function RecordingRow({
       </div>
 
       {node.transcript ? (
-        <p className="mb-3 text-sm leading-relaxed text-ink-muted">{node.transcript}</p>
+        <p className="mb-2.5 text-sm leading-relaxed text-ink-muted">{node.transcript}</p>
       ) : null}
 
       <div className="flex items-center gap-1.5">
@@ -142,29 +142,29 @@ export function RecordingLibrary({ nodes, onDelete, deletingId }: RecordingLibra
   }
 
   return (
-    <section className="form-card px-[26px] pb-[26px] pt-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-baseline gap-2.5">
-          <h2 className="font-serif text-[19px] font-medium text-ink">Saved Recordings</h2>
-          <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint">
-            {String(completed.length).padStart(2, "0")} done
+    <section className="form-card card-body">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-baseline gap-2">
+          <h2 className="panel-title">Saved Recordings</h2>
+          <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint tabular-nums">
+            {String(completed.length).padStart(2, "0")} saved
           </span>
         </div>
         <button
           aria-label="Download all recordings"
-          className="flex h-9 w-9 items-center justify-center rounded border border-line bg-fill hover:bg-page disabled:opacity-40"
+          className="btn-icon"
           disabled={completed.length === 0}
           onClick={() => downloadAll(completed)}
           type="button"
         >
-          <Download className="h-4 w-4 text-ink-placeholder" />
+          <Download className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {recordings.length === 0 ? (
-        <div className="flex items-center gap-3 border-t border-line-soft pt-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-dashed border-line-hair bg-page">
-            <Volume2 className="h-[17px] w-[17px] text-[#b3ada3]" />
+        <div className="flex items-center gap-2.5 border-t border-line-soft/80 pt-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-dashed border-line-hair bg-page">
+            <Volume2 className="h-4 w-4 text-ink-placeholder" />
           </div>
           <p className="m-0 text-sm leading-relaxed text-ink-placeholder">
             Recordings will appear here as each response is saved.

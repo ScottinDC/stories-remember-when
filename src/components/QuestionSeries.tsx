@@ -11,22 +11,22 @@ type QuestionSeriesProps = {
 function statusEyebrow(node: MemoryNode, isActive: boolean) {
   if (isActive && node.status === "pending") {
     return (
-      <span className="flex items-center gap-2 font-mono text-[10.5px] font-normal uppercase tracking-[0.18em] text-[#9db8d0]">
-        <span className="inline-block h-[7px] w-[7px] rounded-full bg-[#5fb0e8]" />
-        Current prompt
+      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[#9db8d0]">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#5fb0e8]" />
+        Current
       </span>
     );
   }
   if (node.status === "processing") {
     return (
-      <span className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-faint">
+      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint">
         <Loader2 className="h-3 w-3 animate-spin" />
         Working
       </span>
     );
   }
   return (
-    <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-faint">{seriesLabel(node)}</span>
+    <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint">{seriesLabel(node)}</span>
   );
 }
 
@@ -35,29 +35,29 @@ export function QuestionSeries({ nodes, activeQuestionId, onSelect }: QuestionSe
   const followUps = nodes.filter((node) => node.depth > 0);
 
   return (
-    <section className="form-card px-[26px] pb-3.5 pt-2">
-      <div className="flex items-baseline justify-between border-b border-ink-body py-[18px]">
+    <section className="form-card">
+      <div className="card-header mx-5 mt-1">
         <h2 className="panel-title">Question Series</h2>
-        <span className="panel-subtitle">{foundation.length} Prompts</span>
+        <span className="panel-subtitle">{foundation.length} prompts</span>
       </div>
 
-      <ol className="m-0 list-none p-0">
+      <ol className="m-0 list-none px-2 pb-2 pt-1">
         {foundation.map((node, index) => {
           const isActive = node.id === activeQuestionId;
           const isLast = index === foundation.length - 1 && followUps.length === 0;
 
           if (isActive) {
             return (
-              <li className="my-3.5" key={node.id}>
+              <li className="my-2 px-3" key={node.id}>
                 <button
-                  className="grid w-full grid-cols-[54px_1fr] items-start gap-5 rounded bg-navy p-[22px] text-left text-white"
+                  className="grid w-full grid-cols-[2.75rem_1fr] items-start gap-3 rounded bg-navy px-4 py-3.5 text-left text-white"
                   onClick={() => onSelect(node.id)}
                   type="button"
                 >
-                  <span className="font-serif text-[34px] font-normal leading-none">{questionNumber(node)}</span>
+                  <span className="font-serif text-[1.75rem] font-normal leading-none tabular-nums">{questionNumber(node)}</span>
                   <span>
-                    <span className="mb-2 block">{statusEyebrow(node, true)}</span>
-                    <span className="text-lg font-medium leading-snug text-[#f4f7fa]">{node.question}</span>
+                    <span className="mb-1 block">{statusEyebrow(node, true)}</span>
+                    <span className="text-[15px] font-medium leading-snug text-[#f4f7fa]">{node.question}</span>
                   </span>
                 </button>
               </li>
@@ -66,14 +66,16 @@ export function QuestionSeries({ nodes, activeQuestionId, onSelect }: QuestionSe
 
           return (
             <li
-              className={`grid grid-cols-[54px_1fr] items-start gap-5 py-5 ${isLast ? "pb-1.5" : "border-b border-line-soft"}`}
+              className={`grid grid-cols-[2.75rem_1fr] items-start gap-3 px-3 py-3.5 ${isLast ? "" : "border-b border-line-soft/80"}`}
               key={node.id}
             >
               <button className="contents text-left" onClick={() => onSelect(node.id)} type="button">
-                <span className="font-serif text-[34px] font-normal leading-none text-num">{questionNumber(node)}</span>
+                <span className="font-serif text-[1.75rem] font-normal leading-none tabular-nums text-num">
+                  {questionNumber(node)}
+                </span>
                 <span>
-                  <span className="mb-2 block">{statusEyebrow(node, false)}</span>
-                  <span className="text-lg leading-snug text-ink-secondary">{node.question}</span>
+                  <span className="mb-1 block">{statusEyebrow(node, false)}</span>
+                  <span className="text-[15px] leading-snug text-ink-secondary">{node.question}</span>
                 </span>
               </button>
             </li>
@@ -83,20 +85,22 @@ export function QuestionSeries({ nodes, activeQuestionId, onSelect }: QuestionSe
         {followUps.map((node) => {
           const isActive = node.id === activeQuestionId;
           return (
-            <li className="border-t border-line-soft py-4" key={node.id}>
+            <li className="border-t border-line-soft/80 px-3 py-3" key={node.id}>
               <button
-                className={`grid w-full grid-cols-[54px_1fr] items-start gap-5 text-left ${isActive ? "rounded bg-navy/90 p-4 text-white" : ""}`}
+                className={`grid w-full grid-cols-[2.75rem_1fr] items-start gap-3 text-left ${isActive ? "rounded bg-navy px-3 py-2.5 text-white" : ""}`}
                 onClick={() => onSelect(node.id)}
                 type="button"
               >
-                <span className={`font-serif text-[28px] font-normal leading-none ${isActive ? "text-white" : "text-num"}`}>
+                <span
+                  className={`font-serif text-xl font-normal leading-none tabular-nums ${isActive ? "text-white" : "text-num"}`}
+                >
                   {questionNumber(node)}
                 </span>
                 <span>
-                  <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                    {seriesLabel(node)} · {node.branchLabel} · gen {node.generation}
+                  <span className="mb-0.5 block font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint">
+                    {node.branchLabel} · gen {node.generation}
                   </span>
-                  <span className={`text-base leading-snug ${isActive ? "text-[#f4f7fa]" : "text-ink-secondary"}`}>
+                  <span className={`text-sm leading-snug ${isActive ? "text-[#f4f7fa]" : "text-ink-secondary"}`}>
                     {node.question}
                   </span>
                 </span>
