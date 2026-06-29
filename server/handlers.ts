@@ -1,4 +1,5 @@
 import { authConfig } from "./auth";
+import { probeStorageAccess } from "./gcs-client";
 import { storageConfig } from "./runtime-env";
 import {
   addFollowUpQuestion,
@@ -15,7 +16,8 @@ import { prepareAudioForUpload } from "./audio";
 import { deleteAnswerArtifacts, uploadAudioToGcs, writeAnswerManifest } from "./storage";
 
 export async function handleHealth() {
-  return { ok: true, ...authConfig(), ...storageConfig() };
+  const storageProbe = await probeStorageAccess();
+  return { ok: true, ...authConfig(), ...storageConfig(), ...storageProbe };
 }
 
 export async function handleGetInterview() {

@@ -3,14 +3,26 @@ import { seriesPrefix } from "./tree";
 import type { AnswerManifest, MemoryNode } from "./types";
 
 export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> {
-  const storage = getStorageClient();
+  let storage;
+  try {
+    storage = getStorageClient();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not initialize cloud storage.";
+    throw new Error(message);
+  }
+
   const file = storage.bucket(getBucketName()).file(objectName);
 
   try {
     const [contents] = await file.download();
     return JSON.parse(contents.toString("utf8")) as T;
-  } catch {
-    return null;
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? Number(error.code) : undefined;
+    if (code === 404) {
+      return null;
+    }
+    const message = error instanceof Error ? error.message : "Could not read from cloud storage.";
+    throw new Error(message);
   }
 }
 

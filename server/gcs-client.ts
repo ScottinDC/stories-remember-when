@@ -1,15 +1,50 @@
 import { Storage } from "@google-cloud/storage";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { readRuntimeEnv } from "./runtime-env";
 
 let cachedClient: Storage | null = null;
 
-function parseServiceAccountJson(raw: string) {
-  try {
-    return JSON.parse(raw) as { project_id?: string };
-  } catch {
-    return JSON.parse(raw.replace(/\\n/g, "\n")) as { project_id?: string };
+type ServiceAccountCredentials = {
+  project_id?: string;
+  private_key?: string;
+  client_email?: string;
+};
+
+function normalizePrivateKey(credentials: ServiceAccountCredentials) {
+  if (!credentials.private_key?.includes("\\n")) {
+    return credentials;
   }
+  return {
+    ...credentials,
+    private_key: credentials.private_key.replace(/\\n/g, "\n")
+  };
+}
+
+function parseServiceAccountJson(raw: string): ServiceAccountCredentials {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = JSON.parse(raw.replace(/\\n/g, "\n"));
+  }
+
+  if (typeof parsed === "string") {
+    parsed = JSON.parse(parsed);
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON is not valid JSON.");
+  }
+
+  return normalizePrivateKey(parsed as ServiceAccountCredentials);
+}
+
+function writeTempCredentialsFile(credentials: ServiceAccountCredentials) {
+  const path = join(tmpdir(), "remember-when-gcp-credentials.json");
+  writeFileSync(path, JSON.stringify(credentials));
+  return path;
 }
 
 export function getStorageClient() {
@@ -22,6 +57,7 @@ export function getStorageClient() {
 
   if (serviceAccountJson) {
     const credentials = parseServiceAccountJson(serviceAccountJson);
+    writeTempCredentialsFile(credentials);
     cachedClient = new Storage({
       projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT") ?? credentials.project_id,
       credentials
@@ -30,7 +66,9 @@ export function getStorageClient() {
   }
 
   if (credentialsPath) {
-    const credentials = JSON.parse(readFileSync(credentialsPath, "utf8"));
+    const credentials = normalizePrivateKey(
+      JSON.parse(readFileSync(credentialsPath, "utf8")) as ServiceAccountCredentials
+    );
     cachedClient = new Storage({
       projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT") ?? credentials.project_id,
       credentials
@@ -50,4 +88,16 @@ export function getBucketName() {
     throw new Error("GOOGLE_CLOUD_STORAGE_BUCKET is not configured.");
   }
   return bucketName;
+}
+
+export async function probeStorageAccess() {
+  try {
+    const storage = getStorageClient();
+    const bucket = storage.bucket(getBucketName());
+    await bucket.file("app/interview-state.json").getMetadata();
+    return { storageReadable: true as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Storage probe failed.";
+    return { storageReadable: false as const, storageError: message };
+  }
 }
