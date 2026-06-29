@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import { select } from "d3";
+import { palette } from "../lib/colors";
 import { buildSankeyData } from "../lib/interview";
 import type { MemoryNode } from "../types";
 
@@ -29,12 +30,12 @@ type LayoutLink = {
 
 function statusColor(status: MemoryNode["status"]) {
   if (status === "answered") {
-    return "#6b4c9a";
+    return palette.dustyBlue;
   }
   if (status === "processing") {
-    return "#d4a017";
+    return palette.paleBlue;
   }
-  return "#bdbdbd";
+  return palette.sand;
 }
 
 export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
@@ -96,7 +97,7 @@ export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
       .data(graph.links)
       .join("path")
       .attr("d", sankeyLinkHorizontal())
-      .attr("stroke", "#6b4c9a")
+      .attr("stroke", palette.dustyBlue)
       .attr("stroke-width", (link) => Math.max(1, link.width ?? 1));
 
     svg
@@ -120,7 +121,7 @@ export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
       .attr("y", (node) => ((node.y0 ?? 0) + (node.y1 ?? 0)) / 2)
       .attr("dy", "0.35em")
       .attr("font-size", 12)
-      .attr("fill", "#444")
+      .attr("fill", "#5a6570")
       .text((node) => node.name);
   }, [nodes]);
 
@@ -130,8 +131,8 @@ export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
 
   return (
     <div className="form-card p-4">
-      <h2 className="mb-3 text-base font-normal text-[#1a1a1a]">Question progression</h2>
-      <p className="mb-4 text-sm text-[#666]">
+      <h2 className="mb-3 text-base font-normal text-ink">Question progression</h2>
+      <p className="mb-4 text-sm text-ink-muted">
         Each branch shows how OpenAI guided follow-up questions from earlier answers.
       </p>
       <svg ref={svgRef} className="h-auto w-full" role="img" aria-label="Question tree Sankey diagram" />
