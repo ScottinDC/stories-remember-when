@@ -55,6 +55,7 @@ const localEnv = (() => {
 })();
 
 const envVars = {
+  DATABASE_BACKEND: "gcs",
   OPENAI_MODEL: localEnv.OPENAI_MODEL || "gpt-4.1-mini",
   OPENAI_TRANSCRIPTION_MODEL: localEnv.OPENAI_TRANSCRIPTION_MODEL || "whisper-1",
   GOOGLE_CLOUD_PROJECT: localEnv.GOOGLE_CLOUD_PROJECT || "remember-when-500816",

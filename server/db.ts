@@ -2,7 +2,11 @@ import * as gcsStore from "./store-gcs";
 import type { InterviewState, MemoryNode } from "./types";
 
 function useGcsStore() {
-  return Boolean(process.env.NETLIFY || process.env.DATABASE_BACKEND === "gcs");
+  return Boolean(
+    process.env.NETLIFY ||
+      process.env.DATABASE_BACKEND === "gcs" ||
+      process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON
+  );
 }
 
 async function store() {
