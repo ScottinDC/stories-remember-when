@@ -1,16 +1,9 @@
 import * as gcsStore from "./store-gcs";
+import { useGcsBackend } from "./runtime-env";
 import type { InterviewState, MemoryNode } from "./types";
 
-function useGcsStore() {
-  return Boolean(
-    process.env.NETLIFY ||
-      process.env.DATABASE_BACKEND === "gcs" ||
-      process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON
-  );
-}
-
 async function store() {
-  if (useGcsStore()) {
+  if (useGcsBackend()) {
     return gcsStore;
   }
   return import("./store-sqlite");

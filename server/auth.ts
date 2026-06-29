@@ -1,34 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-
-type RuntimeEnvName =
-  | "ALLOWED_EMAILS"
-  | "AUTH_DISABLED"
-  | "URL"
-  | "NETLIFY"
-  | "AWS_LAMBDA_FUNCTION_NAME";
-
-// Split keys so esbuild/Netlify bundlers cannot inline build-time empties.
-const RUNTIME_ENV_KEY: Record<RuntimeEnvName, string> = {
-  ALLOWED_EMAILS: "ALLOW" + "ED_EMAILS",
-  AUTH_DISABLED: "AUTH" + "_DISABLED",
-  URL: "UR" + "L",
-  NETLIFY: "NET" + "LIFY",
-  AWS_LAMBDA_FUNCTION_NAME: "AWS" + "_LAMBDA_FUNCTION_NAME"
-};
-
-function readRuntimeEnv(name: RuntimeEnvName) {
-  const env = globalThis.process?.env;
-  if (!env) {
-    return undefined;
-  }
-  return env[RUNTIME_ENV_KEY[name]];
-}
-
-function isNetlifyRuntime() {
-  return readRuntimeEnv("NETLIFY") === "true" || Boolean(readRuntimeEnv("AWS_LAMBDA_FUNCTION_NAME"));
-}
 
 export function isAuthDisabled() {
   if (isNetlifyRuntime()) {

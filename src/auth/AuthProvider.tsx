@@ -86,7 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!accessCheck.ok) {
-        throw new Error("Could not verify account access.");
+        const payload = (await accessCheck.json().catch(() => null)) as { error?: string } | null;
+        setUser(null);
+        setError(payload?.error ?? "Could not load the interview. Try again in a moment.");
+        return;
       }
 
       setUser(currentUser);
@@ -97,7 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser({ email: "local-dev@remember-when.local" });
         setError(null);
       } else {
-        const message = bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
+        const message =
+          bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
         setUser(null);
         setConfigStatus("failed");
         setError(message);

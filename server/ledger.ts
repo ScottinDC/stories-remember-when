@@ -1,5 +1,6 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { useGcsBackend } from "./runtime-env";
 import { appendLineToGcs } from "./storage";
 import type { MemoryNode } from "./types";
 
@@ -7,11 +8,7 @@ const GCS_LEDGER_OBJECT = "app/interview-ledger.jsonl";
 const LOCAL_LEDGER_PATH = process.env.LEDGER_PATH ?? "./data/interview-ledger.jsonl";
 
 function useGcsLedger() {
-  return Boolean(
-    process.env.NETLIFY ||
-      process.env.DATABASE_BACKEND === "gcs" ||
-      process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON
-  );
+  return useGcsBackend();
 }
 
 export type LedgerEvent =

@@ -1,5 +1,6 @@
 import { Storage } from "@google-cloud/storage";
 import { readFileSync } from "node:fs";
+import { readRuntimeEnv } from "./runtime-env";
 
 let cachedClient: Storage | null = null;
 
@@ -8,13 +9,13 @@ export function getStorageClient() {
     return cachedClient;
   }
 
-  const serviceAccountJson = process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON;
-  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const serviceAccountJson = readRuntimeEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON");
+  const credentialsPath = readRuntimeEnv("GOOGLE_APPLICATION_CREDENTIALS");
 
   if (serviceAccountJson) {
     const credentials = JSON.parse(serviceAccountJson);
     cachedClient = new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT ?? credentials.project_id,
+      projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT") ?? credentials.project_id,
       credentials
     });
     return cachedClient;
@@ -23,20 +24,20 @@ export function getStorageClient() {
   if (credentialsPath) {
     const credentials = JSON.parse(readFileSync(credentialsPath, "utf8"));
     cachedClient = new Storage({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT ?? credentials.project_id,
+      projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT") ?? credentials.project_id,
       credentials
     });
     return cachedClient;
   }
 
   cachedClient = new Storage({
-    projectId: process.env.GOOGLE_CLOUD_PROJECT
+    projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT")
   });
   return cachedClient;
 }
 
 export function getBucketName() {
-  const bucketName = process.env.GOOGLE_CLOUD_STORAGE_BUCKET;
+  const bucketName = readRuntimeEnv("GOOGLE_CLOUD_STORAGE_BUCKET");
   if (!bucketName) {
     throw new Error("GOOGLE_CLOUD_STORAGE_BUCKET is not configured.");
   }
