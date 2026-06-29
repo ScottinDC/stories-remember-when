@@ -17,19 +17,6 @@ type NetlifyIdentityContext = {
 
 type NetlifyGlobals = {
   netlifyIdentityContext?: NetlifyIdentityContext;
-  Netlify?: {
-    context?: {
-      cookies?: {
-        get?: (name: string) => string | undefined;
-      };
-    };
-  };
-};
-
-type AuthRequestContext = {
-  cookies?: {
-    get?: (name: string) => string | undefined;
-  };
 };
 
 type AccessTokenClaims = {
@@ -99,7 +86,7 @@ export function isEmailAllowed(email: string) {
   return allowed.includes(email.trim().toLowerCase());
 }
 
-export function extractBearerToken(headerValue: string | null | undefined) {
+function extractBearerToken(headerValue: string | null | undefined) {
   if (!headerValue?.startsWith("Bearer ")) {
     return null;
   }
@@ -124,28 +111,10 @@ function readCookieHeader(cookieHeader: string | null | undefined, name: string)
   }
 }
 
-function readRuntimeCookie(name: string, requestContext?: AuthRequestContext) {
-  try {
-    const fromHandler = requestContext?.cookies?.get?.(name);
-    if (fromHandler) {
-      return fromHandler;
-    }
-  } catch {
-    // Ignore cookie API failures and fall back to request parsing.
-  }
-
-  return (globalThis as NetlifyGlobals).Netlify?.context?.cookies?.get?.(name) ?? null;
-}
-
-function readServerJwt(req?: Request, requestContext?: AuthRequestContext) {
+function readRequestJwt(req?: Request) {
   const bearer = extractBearerToken(req?.headers.get("authorization"));
   if (bearer) {
     return bearer;
-  }
-
-  const fromRuntime = readRuntimeCookie("nf_jwt", requestContext);
-  if (fromRuntime) {
-    return fromRuntime;
   }
 
   return readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
@@ -182,28 +151,21 @@ function emailFromJwt(token: string) {
   return email;
 }
 
-function resolveAuthenticatedEmail(req?: Request, requestContext?: AuthRequestContext): string {
-  const token = readServerJwt(req, requestContext);
-  if (token) {
-    try {
-      return emailFromJwt(token);
-    } catch (error) {
-      const identityContext = getNetlifyIdentityContext();
-      const email = identityContext ? emailFromIdentityContext(identityContext) : null;
-      if (email) {
-        return email;
-      }
-      throw error;
+function resolveAuthenticatedEmail(req?: Request): string {
+  const identityContext = getNetlifyIdentityContext();
+  if (identityContext?.user) {
+    const email = emailFromIdentityContext(identityContext);
+    if (email) {
+      return email;
     }
   }
 
-  const identityContext = getNetlifyIdentityContext();
-  const email = identityContext ? emailFromIdentityContext(identityContext) : null;
-  if (email) {
-    return email;
+  const token = readRequestJwt(req);
+  if (!token) {
+    throw new Error("Sign in required.");
   }
 
-  throw new Error("Sign in required.");
+  return emailFromJwt(token);
 }
 
 export type AuthResult =
@@ -213,8 +175,7 @@ export type AuthResult =
 export async function requireAuth(
   authHeader: string | null | undefined,
   _requestUrl?: string,
-  req?: Request,
-  requestContext?: AuthRequestContext
+  req?: Request
 ): Promise<AuthResult> {
   if (isAuthDisabled()) {
     return { email: "local-dev@remember-when.local" };
@@ -222,7 +183,7 @@ export async function requireAuth(
 
   try {
     const email = req
-      ? resolveAuthenticatedEmail(req, requestContext)
+      ? resolveAuthenticatedEmail(req)
       : emailFromJwt(extractBearerToken(authHeader) ?? (() => { throw new Error("Sign in required."); })());
     if (!isEmailAllowed(email)) {
       return {

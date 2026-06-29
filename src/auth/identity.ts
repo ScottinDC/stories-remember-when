@@ -117,9 +117,9 @@ function readLegacyHashToken() {
 }
 
 export function getStoredAccessToken() {
-  const fromCookie = readCookieToken("nf_jwt");
-  if (fromCookie) {
-    return syncStoredAccessToken(fromCookie);
+  const fromHash = readLegacyHashToken();
+  if (fromHash) {
+    return fromHash;
   }
 
   const stored = sessionStorage.getItem(TOKEN_STORAGE_KEY);
@@ -127,7 +127,12 @@ export function getStoredAccessToken() {
     return stored;
   }
 
-  return readLegacyHashToken();
+  const fromCookie = readCookieToken("nf_jwt");
+  if (fromCookie) {
+    return syncStoredAccessToken(fromCookie);
+  }
+
+  return null;
 }
 
 export function hasStoredSession() {
@@ -149,7 +154,8 @@ export async function resolveAuthUser(): Promise<AuthUser | null> {
   try {
     const callback = await handleAuthCallback();
     if (callback?.user?.email) {
-      syncStoredAccessToken(getStoredAccessToken());
+      const token = readCookieToken("nf_jwt");
+      syncStoredAccessToken(token);
       return { email: callback.user.email };
     }
   } catch {
@@ -159,7 +165,8 @@ export async function resolveAuthUser(): Promise<AuthUser | null> {
   try {
     const hydrated = await hydrateSession();
     if (hydrated?.email) {
-      syncStoredAccessToken(getStoredAccessToken());
+      const token = readCookieToken("nf_jwt");
+      syncStoredAccessToken(token);
       return { email: hydrated.email };
     }
   } catch {

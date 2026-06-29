@@ -32,7 +32,7 @@ export default async (req: Request, context: Context) => {
       return json(await handleHealth());
     }
 
-    const auth = await requireAuth(req.headers.get("authorization"), req.url, req, context);
+    const auth = await requireAuth(req.headers.get("authorization"), req.url, req);
     if ("status" in auth) {
       return json({ error: auth.error }, auth.status);
     }

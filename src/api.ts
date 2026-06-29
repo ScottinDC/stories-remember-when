@@ -27,13 +27,32 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
     }
   });
 
-  if (response.status === 401 || response.status === 403) {
-    clearStoredAccessToken();
-    const error = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new ApiAuthError(error?.error ?? "Sign in required.", response.status);
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = await response.text();
+
+  if (/Internal Error/i.test(body)) {
+    throw new Error("The server had trouble responding. Wait a moment, then try again.");
   }
 
-  return response;
+  if (response.status === 401 || response.status === 403) {
+    clearStoredAccessToken();
+    let message = "Sign in required.";
+    if (contentType.includes("application/json")) {
+      try {
+        const error = JSON.parse(body) as { error?: string };
+        message = error.error ?? message;
+      } catch {
+        // Keep default message.
+      }
+    }
+    throw new ApiAuthError(message, response.status);
+  }
+
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
 }
 
 async function sleep(ms: number) {
@@ -61,26 +80,6 @@ async function pollInterview(questionId: string, attempts = 60): Promise<Intervi
   throw new Error("Saving is taking longer than expected. Please refresh and try again.");
 }
 
-export async function verifySession() {
-  const response = await apiFetch("/api/session");
-  if (!response.ok) {
-    const body = await response.text();
-    if (/Internal Error/i.test(body)) {
-      throw new Error("The server could not verify your sign-in. Please try again.");
-    }
-    let message: string | undefined;
-    try {
-      const error = JSON.parse(body) as { error?: string };
-      message = error.error;
-    } catch {
-      message = body.trim() || undefined;
-    }
-    throw new ApiAuthError(message ?? "Sign in required.", response.status);
-  }
-
-  return (await response.json()) as { ok: boolean; email: string };
-}
-
 export async function fetchInterview() {
   const attempts = 3;
   let lastError: Error | null = null;
@@ -89,16 +88,12 @@ export async function fetchInterview() {
     try {
       const response = await apiFetch("/api/interview");
       if (!response.ok) {
-        const body = await response.text();
-        if (/Internal Error/i.test(body)) {
-          throw new Error("INTERVIEW_INTERNAL_ERROR");
-        }
         let message: string | undefined;
         try {
-          const error = JSON.parse(body) as { error?: string };
+          const error = JSON.parse(await response.text()) as { error?: string };
           message = error.error;
         } catch {
-          message = body.trim() || undefined;
+          message = undefined;
         }
         throw new Error(message ?? `Could not load the interview (${response.status}).`);
       }
@@ -108,15 +103,8 @@ export async function fetchInterview() {
         throw error;
       }
       lastError = error instanceof Error ? error : new Error("Could not load the interview.");
-      const shouldRetry =
-        lastError.message === "INTERVIEW_INTERNAL_ERROR" ||
-        lastError.message.includes("Could not load the interview (5");
+      const shouldRetry = lastError.message.includes("Could not load the interview (5");
       if (!shouldRetry || index === attempts - 1) {
-        if (lastError.message === "INTERVIEW_INTERNAL_ERROR") {
-          throw new Error(
-            "The server had trouble loading the interview. Use “Clear session and try again” on the sign-in screen."
-          );
-        }
         throw lastError;
       }
       await sleep(1000 * (index + 1));
