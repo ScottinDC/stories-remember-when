@@ -1,7 +1,5 @@
 import { Storage } from "@google-cloud/storage";
-import { readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { readRuntimeEnv } from "./runtime-env";
 
 let cachedClient: Storage | null = null;
@@ -41,12 +39,6 @@ function parseServiceAccountJson(raw: string): ServiceAccountCredentials {
   return normalizePrivateKey(parsed as ServiceAccountCredentials);
 }
 
-function writeTempCredentialsFile(credentials: ServiceAccountCredentials) {
-  const path = join(tmpdir(), "remember-when-gcp-credentials.json");
-  writeFileSync(path, JSON.stringify(credentials));
-  return path;
-}
-
 export function getStorageClient() {
   if (cachedClient) {
     return cachedClient;
@@ -57,7 +49,6 @@ export function getStorageClient() {
 
   if (serviceAccountJson) {
     const credentials = parseServiceAccountJson(serviceAccountJson);
-    writeTempCredentialsFile(credentials);
     cachedClient = new Storage({
       projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT") ?? credentials.project_id,
       credentials
@@ -88,16 +79,4 @@ export function getBucketName() {
     throw new Error("GOOGLE_CLOUD_STORAGE_BUCKET is not configured.");
   }
   return bucketName;
-}
-
-export async function probeStorageAccess() {
-  try {
-    const storage = getStorageClient();
-    const bucket = storage.bucket(getBucketName());
-    await bucket.file("app/interview-state.json").getMetadata();
-    return { storageReadable: true as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Storage probe failed.";
-    return { storageReadable: false as const, storageError: message };
-  }
 }

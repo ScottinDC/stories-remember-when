@@ -17,8 +17,8 @@ export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> 
     const [contents] = await file.download();
     return JSON.parse(contents.toString("utf8")) as T;
   } catch (error) {
-    const code = typeof error === "object" && error && "code" in error ? Number(error.code) : undefined;
-    if (code === 404) {
+    const code = typeof error === "object" && error && "code" in error ? String(error.code) : undefined;
+    if (code === "404" || code === "ENOENT") {
       return null;
     }
     const message = error instanceof Error ? error.message : "Could not read from cloud storage.";

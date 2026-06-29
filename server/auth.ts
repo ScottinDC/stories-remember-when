@@ -1,7 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
-
-let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 export function isAuthDisabled() {
   if (isNetlifyRuntime()) {
@@ -38,13 +35,6 @@ function resolveSiteUrl(requestUrl?: string) {
   return "";
 }
 
-function getJwks(siteUrl: string) {
-  if (!jwks) {
-    jwks = createRemoteJWKSet(new URL(`${siteUrl}/.netlify/identity/.well-known/jwks.json`));
-  }
-  return jwks;
-}
-
 export function extractBearerToken(headerValue: string | null | undefined) {
   if (!headerValue?.startsWith("Bearer ")) {
     return null;
@@ -53,35 +43,34 @@ export function extractBearerToken(headerValue: string | null | undefined) {
   return token || null;
 }
 
-export async function verifyAccessToken(token: string, requestUrl?: string) {
+async function fetchIdentityUser(token: string, requestUrl?: string) {
   const siteUrl = resolveSiteUrl(requestUrl);
   if (!siteUrl) {
     throw new Error("Could not resolve site URL for auth verification.");
   }
 
-  let email: string | null = null;
+  const response = await fetch(`${siteUrl}/.netlify/identity/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json"
+    },
+    signal: AbortSignal.timeout(8000)
+  });
 
-  try {
-    const { payload } = await jwtVerify(token, getJwks(siteUrl));
-    email = typeof payload.email === "string" ? payload.email : null;
-  } catch {
-    const response = await fetch(`${siteUrl}/.netlify/identity/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Invalid or expired sign-in.");
-    }
-
-    const user = (await response.json()) as { email?: string };
-    email = user.email ?? null;
+  if (!response.ok) {
+    throw new Error("Invalid or expired sign-in.");
   }
 
-  if (!email) {
+  const user = (await response.json()) as { email?: string };
+  if (!user.email) {
     throw new Error("Token is missing an email claim.");
   }
+
+  return user.email;
+}
+
+export async function verifyAccessToken(token: string, requestUrl?: string) {
+  const email = await fetchIdentityUser(token, requestUrl);
 
   if (!isEmailAllowed(email)) {
     throw new Error("This account is not authorized to access Remember When.");
