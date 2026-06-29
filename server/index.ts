@@ -12,6 +12,7 @@ if (existsSync(localEnv)) {
 import cors from "cors";
 import express from "express";
 import multer from "multer";
+import { requireAuth } from "./auth";
 import { handleDeleteAnswer, handleGetInterview, handleHealth, handlePostAnswer } from "./handlers";
 
 const app = express();
@@ -32,6 +33,21 @@ app.get("/api/health", async (_req, res, next) => {
     next(error);
   }
 });
+
+async function requireAuthMiddleware(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const auth = await requireAuth(req.headers.authorization, `${req.protocol}://${req.get("host")}${req.originalUrl}`);
+  if ("status" in auth) {
+    res.status(auth.status).json({ error: auth.error });
+    return;
+  }
+  next();
+}
+
+app.use("/api", requireAuthMiddleware);
 
 app.get("/api/interview", async (_req, res, next) => {
   try {

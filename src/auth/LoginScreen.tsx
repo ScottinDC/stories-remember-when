@@ -1,0 +1,79 @@
+import { Loader2, LogOut } from "lucide-react";
+import { useAuth } from "./AuthProvider";
+
+export function LoginScreen() {
+  const { authConfigured, error, loginWithGoogle } = useAuth();
+
+  return (
+    <main className="grid min-h-screen place-items-center bg-page px-5">
+      <div className="form-card w-full max-w-md">
+        <div className="card-header px-5">
+          <div>
+            <p className="mono-eyebrow mb-1">Private Family Archive</p>
+            <h1 className="panel-title">Remember When</h1>
+          </div>
+        </div>
+
+        <div className="card-body space-y-4">
+          <p className="text-sm leading-relaxed text-ink-muted">
+            Sign in with Google to continue. Only pre-approved family accounts can access this interview.
+          </p>
+
+          {!authConfigured ? (
+            <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
+              Access control is not configured yet. Add <code className="font-mono text-xs">ALLOWED_EMAILS</code> in
+              Netlify environment variables.
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">{error}</div>
+          ) : null}
+
+          <button className="btn-primary" disabled={!authConfigured} onClick={loginWithGoogle} type="button">
+            Continue with Google
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export function AuthGate({ children }: { children: React.ReactNode }) {
+  const { authRequired, loading, user } = useAuth();
+
+  if (loading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-page">
+        <div className="flex items-center gap-3 font-mono text-sm text-ink-muted">
+          <Loader2 className="h-5 w-5 animate-spin text-navy-light" />
+          Checking access
+        </div>
+      </main>
+    );
+  }
+
+  if (authRequired && !user) {
+    return <LoginScreen />;
+  }
+
+  return <>{children}</>;
+}
+
+export function AuthStatus() {
+  const { authRequired, logout, user } = useAuth();
+
+  if (!authRequired || !user || user.email === "local-dev@remember-when.local") {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3 border-b border-line-soft pb-4">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-faint">Signed in as {user.email}</p>
+      <button className="btn-secondary min-h-8 px-3 text-xs" onClick={() => void logout()} type="button">
+        <LogOut className="h-3.5 w-3.5" />
+        Sign out
+      </button>
+    </div>
+  );
+}

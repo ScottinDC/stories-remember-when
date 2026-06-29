@@ -1,4 +1,5 @@
 import type { Context } from "@netlify/functions";
+import { requireAuth } from "../../server/auth";
 import { markNodeFailed } from "../../server/db";
 import { handleDeleteAnswer, finishBackgroundAnswer, handleGetInterview, handleHealth, handlePostAnswerBackground } from "../../server/handlers";
 
@@ -23,6 +24,11 @@ export default async (req: Request, context: Context) => {
 
     if (req.method === "GET" && path === "/api/health") {
       return json(await handleHealth());
+    }
+
+    const auth = await requireAuth(req.headers.get("authorization"), req.url);
+    if ("status" in auth) {
+      return json({ error: auth.error }, auth.status);
     }
 
     if (req.method === "GET" && path === "/api/interview") {

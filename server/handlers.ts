@@ -1,3 +1,4 @@
+import { authConfig } from "./auth";
 import {
   addFollowUpQuestion,
   clearNodeAnswer,
@@ -13,7 +14,7 @@ import { prepareAudioForUpload } from "./audio";
 import { deleteAnswerArtifacts, uploadAudioToGcs, writeAnswerManifest } from "./storage";
 
 export async function handleHealth() {
-  return { ok: true };
+  return { ok: true, ...authConfig() };
 }
 
 export async function handleGetInterview() {

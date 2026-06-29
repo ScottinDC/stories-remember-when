@@ -1,4 +1,38 @@
 import type { InterviewState } from "./types";
+import { clearStoredAccessToken, getStoredAccessToken } from "./auth/identity";
+
+class ApiAuthError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiAuthError";
+    this.status = status;
+  }
+}
+
+function authHeaders(): HeadersInit {
+  const token = getStoredAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init?.headers ?? {})
+    }
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    clearStoredAccessToken();
+    const error = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new ApiAuthError(error?.error ?? "Sign in required.", response.status);
+  }
+
+  return response;
+}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -7,7 +41,7 @@ async function sleep(ms: number) {
 async function pollInterview(questionId: string, attempts = 60): Promise<InterviewState> {
   for (let index = 0; index < attempts; index += 1) {
     await sleep(2000);
-    const response = await fetch("/api/interview");
+    const response = await apiFetch("/api/interview");
     if (!response.ok) {
       continue;
     }
@@ -26,7 +60,7 @@ async function pollInterview(questionId: string, attempts = 60): Promise<Intervi
 }
 
 export async function fetchInterview() {
-  const response = await fetch("/api/interview");
+  const response = await apiFetch("/api/interview");
   if (!response.ok) {
     throw new Error("Could not load the interview.");
   }
@@ -37,7 +71,7 @@ export async function saveAnswer(questionId: string, audio: Blob) {
   const formData = new FormData();
   formData.append("audio", audio, "answer.webm");
 
-  const response = await fetch(`/api/responses/${questionId}/answer`, {
+  const response = await apiFetch(`/api/responses/${questionId}/answer`, {
     method: "POST",
     body: formData
   });
@@ -65,7 +99,7 @@ export async function saveAnswer(questionId: string, audio: Blob) {
 }
 
 export async function deleteAnswer(questionId: string) {
-  const response = await fetch(`/api/responses/${questionId}/answer`, {
+  const response = await apiFetch(`/api/responses/${questionId}/answer`, {
     method: "DELETE"
   });
 
@@ -93,3 +127,5 @@ export async function saveAllAnswers(entries: Array<{ questionId: string; blob: 
   }
   return { state };
 }
+
+export { ApiAuthError };

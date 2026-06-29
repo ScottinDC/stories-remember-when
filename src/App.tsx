@@ -1,6 +1,8 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
-import { fetchInterview } from "./api";
+import { ApiAuthError, fetchInterview } from "./api";
+import { useAuth } from "./auth/AuthProvider";
+import { AuthStatus } from "./auth/LoginScreen";
 import { AppHeader } from "./components/AppHeader";
 import { InterviewForm } from "./components/InterviewForm";
 import { toTitleCase } from "./lib/titleCase";
@@ -8,6 +10,7 @@ import { countByStatus } from "./lib/interview";
 import type { InterviewState } from "./types";
 
 export function App() {
+  const { logout } = useAuth();
   const [state, setState] = React.useState<InterviewState | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -15,9 +18,15 @@ export function App() {
   React.useEffect(() => {
     fetchInterview()
       .then(setState)
-      .catch((err: Error) => setError(err.message))
+      .catch(async (err: unknown) => {
+        if (err instanceof ApiAuthError) {
+          await logout();
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Could not load the interview.");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [logout]);
 
   if (loading) {
     return (
@@ -43,6 +52,7 @@ export function App() {
   return (
     <main className="min-h-screen bg-page px-5 py-8 md:px-6">
       <div className="mx-auto flex w-full max-w-shell flex-col gap-7">
+        <AuthStatus />
         <AppHeader
           answeredCount={countByStatus(nodes, "answered")}
           pendingCount={countByStatus(nodes, "pending")}
