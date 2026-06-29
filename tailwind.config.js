@@ -4,6 +4,14 @@ export default {
   theme: {
     extend: {
       colors: {
+        page: "#eff3ff",
+        surface: "#c6dbef",
+        accent: {
+          DEFAULT: "#3182bd",
+          dark: "#2171b5",
+          light: "#9ecae1"
+        },
+        sankey: "#6baed6",
         linen: {
           50: "#FFFCF7",
           100: "#F4EFE4",
