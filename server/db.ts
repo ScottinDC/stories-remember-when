@@ -1,9 +1,10 @@
 import * as gcsStore from "./store-gcs";
-import { useGcsBackend } from "./runtime-env";
+import { isNetlifyRuntime, useGcsBackend } from "./runtime-env";
 import type { InterviewState, MemoryNode } from "./types";
 
 async function store() {
-  if (useGcsBackend()) {
+  // Never load better-sqlite3 on Netlify — native module + read-only FS crash the function.
+  if (isNetlifyRuntime() || useGcsBackend()) {
     return gcsStore;
   }
   return import("./store-sqlite");

@@ -49,13 +49,20 @@ async function fetchIdentityUser(token: string, requestUrl?: string) {
     throw new Error("Could not resolve site URL for auth verification.");
   }
 
-  const response = await fetch(`${siteUrl}/.netlify/identity/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json"
-    },
-    signal: AbortSignal.timeout(8000)
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  let response: Response;
+  try {
+    response = await fetch(`${siteUrl}/.netlify/identity/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json"
+      },
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error("Invalid or expired sign-in.");
