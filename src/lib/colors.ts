@@ -1,9 +1,14 @@
 export const palette = {
-  primary: "#9C6644",
-  primaryLight: "#EEE4D7",
-  link: "#9C6644",
-  pending: "#D8CBB8",
-  processing: "#C4A574",
-  ink: "#2A2118",
-  inkMuted: "#6B5E4F"
+  edge: "#3182bd",
+  body: "#6baed6",
+  pending: "#c6dbef",
+  processing: "#6baed6",
+  ink: "#1a365d",
+  inkMuted: "#486581"
 } as const;
+
+export const branchColors = ["#3f6f9c", "#4f8c6a", "#c08a2e", "#bb6240", "#8e5670"] as const;
+
+export function branchColor(sequenceOrder: number) {
+  return branchColors[(sequenceOrder - 1) % branchColors.length];
+}

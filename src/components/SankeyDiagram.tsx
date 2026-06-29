@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import { select } from "d3";
-import { palette } from "../lib/colors";
+import { branchColor } from "../lib/colors";
 import { buildSankeyData } from "../lib/interview";
 import type { MemoryNode } from "../types";
 
@@ -13,6 +13,7 @@ type LayoutNode = {
   id: string;
   name: string;
   status: MemoryNode["status"];
+  sequenceOrder?: number;
   x0?: number;
   x1?: number;
   y0?: number;
@@ -26,18 +27,41 @@ type LayoutLink = {
   width?: number;
   y0?: number;
   y1?: number;
+  label: string;
+};
+
+type SankeyLinkInput = {
+  source: number;
+  target: number;
+  value: number;
+  label: string;
 };
 
 const MIN_CHART_HEIGHT = 450;
 
-function statusColor(status: MemoryNode["status"]) {
-  if (status === "answered") {
-    return palette.primary;
+function nodeColor(node: LayoutNode) {
+  if (node.id === "__start__") {
+    return "transparent";
   }
-  if (status === "processing") {
-    return palette.processing;
+  const order = node.sequenceOrder ?? 1;
+  const base = branchColor(order);
+  if (node.status === "pending") {
+    return base + "66";
   }
-  return palette.pending;
+  if (node.status === "processing") {
+    return base + "aa";
+  }
+  return base;
+}
+
+function linkMidpoint(link: LayoutLink) {
+  const x = ((link.source.x1 ?? 0) + (link.target.x0 ?? 0)) / 2;
+  const y = ((link.y0 ?? 0) + (link.y1 ?? 0)) / 2;
+  return { x, y };
+}
+
+function linkSpan(link: LayoutLink) {
+  return (link.target.x0 ?? 0) - (link.source.x1 ?? 0);
 }
 
 function drawSankey(svgElement: SVGSVGElement, nodes: MemoryNode[], containerWidth: number) {
@@ -50,7 +74,7 @@ function drawSankey(svgElement: SVGSVGElement, nodes: MemoryNode[], containerWid
     ...graphNodes.map((node) => ({ ...node }))
   ];
 
-  const layoutLinks: Array<{ source: number; target: number; value: number }> = [
+  const layoutLinks: SankeyLinkInput[] = [
     ...links,
     ...graphNodes
       .map((node, index) => {
@@ -58,18 +82,19 @@ function drawSankey(svgElement: SVGSVGElement, nodes: MemoryNode[], containerWid
         if (parentExists) {
           return null;
         }
-        return { source: 0, target: index + 1, value: 1 };
+        return {
+          source: 0,
+          target: index + 1,
+          value: 1,
+          label: `Q${node.sequenceOrder}`
+        };
       })
-      .filter((link): link is { source: number; target: number; value: number } => link !== null)
-  ].map((link) => ({
-    source: link.source,
-    target: link.target,
-    value: link.value
-  }));
+      .filter((link): link is SankeyLinkInput => link !== null)
+  ];
 
   const sankeyLayout = sankey<LayoutNode, LayoutLink>()
     .nodeWidth(14)
-    .nodePadding(12)
+    .nodePadding(14)
     .extent([
       [12, 12],
       [width - 12, height - 12]
@@ -89,13 +114,13 @@ function drawSankey(svgElement: SVGSVGElement, nodes: MemoryNode[], containerWid
   svg
     .append("g")
     .attr("fill", "none")
-    .attr("stroke-opacity", 0.35)
     .selectAll("path")
     .data(graph.links)
     .join("path")
     .attr("d", sankeyLinkHorizontal())
-    .attr("stroke", palette.primary)
-    .attr("stroke-width", (link) => Math.max(1, link.width ?? 1));
+    .attr("stroke", (link) => branchColor(link.target.sequenceOrder ?? 1))
+    .attr("stroke-opacity", 0.82)
+    .attr("stroke-width", (link) => Math.max(2, link.width ?? 2));
 
   svg
     .append("g")
@@ -106,20 +131,44 @@ function drawSankey(svgElement: SVGSVGElement, nodes: MemoryNode[], containerWid
     .attr("y", (node) => node.y0 ?? 0)
     .attr("height", (node) => Math.max(1, (node.y1 ?? 0) - (node.y0 ?? 0)))
     .attr("width", (node) => (node.x1 ?? 0) - (node.x0 ?? 0))
-    .attr("fill", (node) => statusColor(node.status))
-    .attr("rx", 3);
+    .attr("fill", (node) => nodeColor(node))
+    .attr("opacity", (node) => (node.id === "__start__" ? 0 : 1))
+    .attr("rx", 2);
 
   svg
     .append("g")
-    .selectAll("text")
-    .data(graph.nodes.filter((node) => node.id !== "__start__"))
-    .join("text")
-    .attr("x", (node) => (node.x1 ?? 0) + 6)
-    .attr("y", (node) => ((node.y0 ?? 0) + (node.y1 ?? 0)) / 2)
-    .attr("dy", "0.35em")
-    .attr("font-size", 12)
-    .attr("fill", palette.inkMuted)
-    .text((node) => node.name);
+    .attr("pointer-events", "none")
+    .selectAll("g")
+    .data(graph.links.filter((link) => linkSpan(link) >= 20))
+    .join("g")
+    .attr("transform", (link) => {
+      const { x, y } = linkMidpoint(link);
+      return `translate(${x},${y})`;
+    })
+    .each(function (link) {
+      const group = select(this);
+      const color = branchColor(link.target.sequenceOrder ?? 1);
+
+      group
+        .append("rect")
+        .attr("x", -26)
+        .attr("y", -13)
+        .attr("width", 52)
+        .attr("height", 26)
+        .attr("fill", "#ffffff")
+        .attr("stroke", color)
+        .attr("stroke-width", 1.5);
+
+      group
+        .append("text")
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle")
+        .attr("font-family", "IBM Plex Mono, monospace")
+        .attr("font-size", 14)
+        .attr("font-weight", 500)
+        .attr("fill", color)
+        .text(link.label);
+    });
 }
 
 export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
@@ -148,14 +197,20 @@ export function SankeyDiagram({ nodes }: SankeyDiagramProps) {
   }
 
   return (
-    <div className="form-card w-full p-4 md:p-5">
-      <h2 className="mb-3 text-base font-normal text-ink">Question Progression</h2>
-      <p className="mb-4 text-sm text-ink-muted">
-        Each branch shows how OpenAI guided follow-up questions from earlier answers.
+    <section className="form-card px-[34px] pb-7 pt-[30px]">
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="panel-title">Question Progression</h2>
+        <span className="panel-subtitle tracking-[0.12em]">Branching flow</span>
+      </div>
+      <p className="mb-[22px] text-sm leading-relaxed text-ink-muted">
+        Each branch is labeled with the question it leads to. The conversation deepens as one response flows into the next.
       </p>
-      <div ref={containerRef} className="min-h-[450px] w-full">
+      <div
+        ref={containerRef}
+        className="min-h-[450px] w-full overflow-x-auto rounded border border-line-soft bg-fill p-3"
+      >
         <svg ref={svgRef} className="block h-auto w-full" role="img" aria-label="Question tree Sankey diagram" />
       </div>
-    </div>
+    </section>
   );
 }

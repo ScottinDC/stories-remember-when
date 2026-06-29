@@ -4,36 +4,39 @@ export default {
   theme: {
     extend: {
       colors: {
-        page: "#eff3ff",
-        surface: "#c6dbef",
-        accent: {
-          DEFAULT: "#3182bd",
-          dark: "#2171b5",
-          light: "#9ecae1"
-        },
-        sankey: "#6baed6",
-        linen: {
-          50: "#FFFCF7",
-          100: "#F4EFE4",
-          200: "#E8DFD0",
-          300: "#D8CBB8"
+        page: "#f4f4f1",
+        surface: "#ffffff",
+        fill: "#fafaf8",
+        navy: {
+          DEFAULT: "#1f3a52",
+          light: "#2c5f8f"
         },
         ink: {
-          DEFAULT: "#2A2118",
-          muted: "#6B5E4F",
-          faint: "#958879"
+          DEFAULT: "#14120f",
+          body: "#1a1714",
+          secondary: "#3a3631",
+          muted: "#6b6660",
+          faint: "#9b958c",
+          placeholder: "#8a857c"
         },
-        umber: {
-          DEFAULT: "#9C6644",
-          dark: "#7A4F33",
-          soft: "#EEE4D7"
-        }
+        line: {
+          DEFAULT: "#e4e1da",
+          soft: "#ecece6",
+          hair: "#d9d6cf"
+        },
+        num: "#c4bfb6",
+        record: "#d24a3d"
       },
       fontFamily: {
-        sans: ["Source Sans 3", "ui-sans-serif", "system-ui", "sans-serif"]
+        sans: ["Open Sans", "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ["Newsreader", "Georgia", "serif"],
+        mono: ["IBM Plex Mono", "ui-monospace", "monospace"]
       },
       boxShadow: {
-        panel: "0 1px 2px rgba(42, 33, 24, 0.05), 0 8px 24px rgba(42, 33, 24, 0.06)"
+        card: "0 1px 1px rgba(20,18,15,0.04), 0 2px 4px -1px rgba(20,18,15,0.07)"
+      },
+      maxWidth: {
+        shell: "1180px"
       }
     }
   },

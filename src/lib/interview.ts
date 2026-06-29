@@ -1,5 +1,7 @@
 import type { MemoryNode } from "../types";
 
+export const FOUNDATION_COUNT = 5;
+
 export function formatTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
     .toString()
@@ -11,7 +13,12 @@ export function formatTime(totalSeconds: number) {
 }
 
 export function chooseNextQuestion(nodes: MemoryNode[]) {
-  return nodes.find((node) => node.status === "pending") ?? null;
+  const sorted = sortBySeries(nodes);
+  const foundationPending = sorted.find((node) => node.depth === 0 && node.status === "pending");
+  if (foundationPending) {
+    return foundationPending;
+  }
+  return sorted.find((node) => node.status === "pending") ?? null;
 }
 
 export function sortBySeries(nodes: MemoryNode[]) {
@@ -26,12 +33,41 @@ export function countByStatus(nodes: MemoryNode[], status: MemoryNode["status"])
   return nodes.filter((node) => node.status === status).length;
 }
 
-export function seriesLabel(node: MemoryNode) {
-  return `Question ${node.sequenceOrder}${node.depth > 0 ? ` · follow-up (depth ${node.depth})` : ""}`;
+export function questionNumber(node: MemoryNode) {
+  return String(node.sequenceOrder).padStart(2, "0");
 }
 
-export type SankeyNode = { name: string; id: string; status: MemoryNode["status"] };
-export type SankeyLink = { source: number; target: number; value: number };
+export function promptLabel(node: MemoryNode) {
+  return `Prompt ${questionNumber(node)}`;
+}
+
+export function questionCode(node: MemoryNode) {
+  return `Q${node.sequenceOrder}`;
+}
+
+export function seriesLabel(node: MemoryNode) {
+  if (node.status === "answered") {
+    return "Saved";
+  }
+  if (node.status === "processing") {
+    return "Working";
+  }
+  return "Pending";
+}
+
+export type SankeyNode = {
+  id: string;
+  name: string;
+  status: MemoryNode["status"];
+  sequenceOrder: number;
+  question: string;
+};
+export type SankeyLink = {
+  source: number;
+  target: number;
+  value: number;
+  label: string;
+};
 
 export function buildSankeyData(nodes: MemoryNode[]) {
   const sorted = sortBySeries(nodes);
@@ -39,8 +75,10 @@ export function buildSankeyData(nodes: MemoryNode[]) {
 
   const sankeyNodes: SankeyNode[] = sorted.map((node) => ({
     id: node.id,
-    name: `Q${node.sequenceOrder}`,
-    status: node.status
+    name: questionCode(node),
+    status: node.status,
+    sequenceOrder: node.sequenceOrder,
+    question: node.question
   }));
 
   const links: SankeyLink[] = [];
@@ -53,7 +91,12 @@ export function buildSankeyData(nodes: MemoryNode[]) {
     if (source === undefined || target === undefined) {
       continue;
     }
-    links.push({ source, target, value: 1 });
+    links.push({
+      source,
+      target,
+      value: 1,
+      label: questionCode(node)
+    });
   }
 
   return { nodes: sankeyNodes, links };

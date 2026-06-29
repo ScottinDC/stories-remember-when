@@ -1,5 +1,3 @@
-import { countByStatus } from "../lib/interview";
-
 type AppHeaderProps = {
   title: string;
   answeredCount: number;
@@ -7,33 +5,37 @@ type AppHeaderProps = {
   processingCount: number;
 };
 
-export function AppHeader({ title, answeredCount, pendingCount, processingCount }: AppHeaderProps) {
+function StatCell({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
-    <header className="form-card p-6 md:p-8">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-2xl space-y-2">
-          <p className="text-sm text-ink-faint">Family Oral History</p>
-          <h1 className="text-2xl font-normal text-ink">{title}</h1>
-          <p className="text-base leading-relaxed text-ink-muted">
-            Record one memory at a time. Each answer is saved, transcribed, and followed by a thoughtful next question.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Saved" value={answeredCount} />
-          <StatCard label="Ready" value={pendingCount} />
-          <StatCard label="Working" value={processingCount} />
-        </div>
-      </div>
-    </header>
+    <div>
+      <div className={`stat-value ${accent ? "text-navy-light" : ""}`}>{String(value).padStart(2, "0")}</div>
+      <div className="stat-label">{label}</div>
+    </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+export function AppHeader({ title, answeredCount, pendingCount, processingCount }: AppHeaderProps) {
   return (
-    <div className="rounded-lg border border-linen-200 bg-linen-50 px-4 py-3 text-center">
-      <p className="text-2xl text-ink">{value}</p>
-      <p className="text-sm text-ink-muted">{label}</p>
-    </div>
+    <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6 border-b-[1.5px] border-ink-body pb-[26px]">
+      <div className="max-w-[620px]">
+        <p className="mono-eyebrow mb-5">
+          Family Oral History &nbsp;/&nbsp; Archive
+        </p>
+        <h1 className="font-serif text-[clamp(2.5rem,5vw,3.75rem)] font-medium leading-none tracking-tight text-ink">
+          {title}
+        </h1>
+        <p className="mt-4 max-w-[500px] text-[15.5px] leading-relaxed text-ink-muted">
+          Record one memory at a time. Each response is saved, transcribed, and followed by a thoughtful next question.
+        </p>
+      </div>
+
+      <div className="flex items-end gap-7 font-mono">
+        <StatCell label="Saved" value={answeredCount} />
+        <div className="h-12 w-px bg-line-hair" />
+        <StatCell accent label="Ready" value={pendingCount} />
+        <div className="h-12 w-px bg-line-hair" />
+        <StatCell label="Working" value={processingCount} />
+      </div>
+    </header>
   );
 }

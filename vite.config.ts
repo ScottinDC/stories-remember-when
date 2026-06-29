@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    strictPort: true,
     watch: {
       ignored: ["**/.tools/**", "**/.gcloud-config/**", "**/.secrets/**", "**/data/**"]
     },

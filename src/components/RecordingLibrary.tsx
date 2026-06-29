@@ -1,6 +1,6 @@
 import React from "react";
-import { Download, DownloadCloud, Loader2, Pause, Play, Trash2 } from "lucide-react";
-import { answeredNodes, seriesLabel } from "../lib/interview";
+import { Download, Loader2, Pause, Play, Trash2, Volume2 } from "lucide-react";
+import { answeredNodes, promptLabel, questionNumber } from "../lib/interview";
 import type { MemoryNode } from "../types";
 
 type RecordingLibraryProps = {
@@ -10,8 +10,7 @@ type RecordingLibraryProps = {
 };
 
 function downloadFilename(node: MemoryNode) {
-  const order = String(node.sequenceOrder).padStart(2, "0");
-  return `remember-when-q${order}.webm`;
+  return `remember-when-q${questionNumber(node)}.webm`;
 }
 
 async function downloadRecording(node: MemoryNode) {
@@ -57,14 +56,14 @@ function RecordingRow({
   const canPlay = Boolean(node.mp3Url && node.status === "answered");
 
   return (
-    <article className="rounded-lg border border-linen-200 bg-linen-50 p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-ink-faint">{seriesLabel(node)}</p>
-          <h3 className="mt-1 text-base font-normal text-ink">{node.question}</h3>
+    <article className="border-t border-line-soft py-4 first:border-t-0 first:pt-0">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">{promptLabel(node)}</p>
+          <h3 className="mt-1 text-sm font-medium leading-snug text-ink">{node.question}</h3>
         </div>
         {node.status === "processing" ? (
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-umber" aria-hidden="true" />
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-navy-light" aria-hidden="true" />
         ) : null}
       </div>
 
@@ -72,7 +71,7 @@ function RecordingRow({
         <p className="mb-3 text-sm leading-relaxed text-ink-muted">{node.transcript}</p>
       ) : null}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <button
           aria-label="Play recording"
           className="btn-icon"
@@ -80,7 +79,7 @@ function RecordingRow({
           onClick={() => node.mp3Url && onPlay(node.id, node.mp3Url)}
           type="button"
         >
-          <Play className="h-4 w-4" />
+          <Play className="h-3.5 w-3.5" />
         </button>
         <button
           aria-label="Pause recording"
@@ -89,16 +88,16 @@ function RecordingRow({
           onClick={onPause}
           type="button"
         >
-          <Pause className="h-4 w-4" />
+          <Pause className="h-3.5 w-3.5" />
         </button>
         <button
           aria-label="Delete recording"
-          className="btn-icon text-[#8b3a3a] hover:bg-[#fff5f5]"
+          className="btn-icon text-[#9b2c2c] hover:border-[#f0caca] hover:bg-[#fff8f8]"
           disabled={deleting || node.status === "processing"}
           onClick={() => onDelete(node.id)}
           type="button"
         >
-          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
         </button>
         <button
           aria-label="Download recording"
@@ -107,7 +106,7 @@ function RecordingRow({
           onClick={() => downloadRecording(node)}
           type="button"
         >
-          <Download className="h-4 w-4" />
+          <Download className="h-3.5 w-3.5" />
         </button>
       </div>
     </article>
@@ -142,27 +141,36 @@ export function RecordingLibrary({ nodes, onDelete, deletingId }: RecordingLibra
   }
 
   return (
-    <div className="form-card p-4 md:p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-normal text-ink">Saved Recordings</h2>
-          <p className="mt-1 text-sm text-ink-muted">{completed.length} completed</p>
+    <section className="form-card px-[26px] pb-[26px] pt-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-baseline gap-2.5">
+          <h2 className="font-serif text-[19px] font-medium text-ink">Saved Recordings</h2>
+          <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+            {String(completed.length).padStart(2, "0")} done
+          </span>
         </div>
         <button
-          className="btn-secondary px-3 py-2 text-sm"
+          aria-label="Download all recordings"
+          className="flex h-9 w-9 items-center justify-center rounded border border-line bg-fill hover:bg-page disabled:opacity-40"
           disabled={completed.length === 0}
           onClick={() => downloadAll(completed)}
           type="button"
         >
-          <DownloadCloud className="h-4 w-4" />
-          Download all
+          <Download className="h-4 w-4 text-ink-placeholder" />
         </button>
       </div>
 
       {recordings.length === 0 ? (
-        <p className="text-sm text-ink-muted">Recordings will appear here as each answer is saved.</p>
+        <div className="flex items-center gap-3 border-t border-line-soft pt-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-dashed border-line-hair bg-page">
+            <Volume2 className="h-[17px] w-[17px] text-[#b3ada3]" />
+          </div>
+          <p className="m-0 text-sm leading-relaxed text-ink-placeholder">
+            Recordings will appear here as each response is saved.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div>
           {recordings.map((node) => (
             <RecordingRow
               deleting={deletingId === node.id}
@@ -176,6 +184,6 @@ export function RecordingLibrary({ nodes, onDelete, deletingId }: RecordingLibra
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

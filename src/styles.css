@@ -9,44 +9,74 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: #eff3ff;
-  color: #1a365d;
-  font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  background: #f4f4f1;
+  color: #1a1714;
+  font-family: "Open Sans", ui-sans-serif, system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #cdd9e4;
+  color: #14120f;
 }
 
 @layer components {
   .form-card {
-    @apply rounded-xl border border-accent bg-surface;
-    box-shadow: 0 1px 2px rgba(26, 54, 93, 0.06);
+    @apply rounded border border-line bg-surface shadow-card;
+  }
+
+  .panel-title {
+    @apply font-serif text-[21px] font-medium text-ink;
+  }
+
+  .panel-subtitle {
+    @apply font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint;
   }
 
   .btn {
-    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg px-4 text-base font-normal transition;
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2.5 rounded px-4 text-sm font-medium transition-colors;
   }
 
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-dark disabled:cursor-wait disabled:opacity-70;
+    @apply btn w-full bg-navy font-mono text-xs font-medium uppercase tracking-[0.18em] text-white hover:bg-navy-light disabled:cursor-wait disabled:opacity-60;
   }
 
   .btn-secondary {
-    @apply btn border border-accent bg-page text-ink hover:bg-surface;
+    @apply btn border border-line bg-fill text-ink-secondary hover:bg-page;
   }
 
   .btn-danger {
-    @apply btn border border-[#e8c4c4] bg-[#fff5f5] text-[#8b3a3a] hover:bg-[#fdeaea];
+    @apply btn border border-[#f0caca] bg-[#fff8f8] text-[#9b2c2c] hover:bg-[#fef2f2];
   }
 
   .btn-icon {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border border-accent bg-surface text-ink transition hover:bg-accent-light/30 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 w-9 items-center justify-center rounded border border-line bg-fill text-ink-placeholder transition-colors hover:border-line hover:bg-page disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .field-label {
-    @apply text-sm text-ink-faint;
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-navy-light;
   }
 
   .input-box {
-    @apply rounded-lg border border-accent bg-surface px-4 py-3 text-base text-ink;
+    @apply rounded border-0 bg-transparent p-0;
   }
+
+  .stat-value {
+    @apply font-mono text-[40px] font-medium leading-[0.9] tracking-tight text-ink-body;
+  }
+
+  .stat-label {
+    @apply mt-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-ink-faint;
+  }
+
+  .mono-eyebrow {
+    @apply font-mono text-[11.5px] font-medium uppercase tracking-[0.26em] text-navy-light;
+  }
+}
+
+audio {
+  @apply w-full rounded;
+  height: 2.25rem;
 }
