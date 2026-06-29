@@ -16,6 +16,7 @@ type AuthContextValue = {
   loading: boolean;
   authRequired: boolean;
   authConfigured: boolean;
+  hasAllowedEmailsKey: boolean;
   configStatus: AuthConfigStatus;
   error: string | null;
   loginWithGoogle: () => void;
@@ -31,7 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = React.useState<string | null>(null);
   const [config, setConfig] = React.useState<AuthConfig>({
     authRequired: true,
-    authConfigured: false
+    authConfigured: false,
+    hasAllowedEmailsKey: false
   });
   const [configStatus, setConfigStatus] = React.useState<AuthConfigStatus>("loading");
 
@@ -46,7 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setConfigStatus("loaded");
 
       if (!authConfig.authRequired) {
-        setUser({ email: "local-dev@remember-when.local" });
+        if (import.meta.env.DEV) {
+          setUser({ email: "local-dev@remember-when.local" });
+        } else {
+          setUser(null);
+          setError("Access control is misconfigured. Redeploy after setting ALLOWED_EMAILS in Netlify.");
+        }
         return;
       }
 
@@ -84,10 +91,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(currentUser);
     } catch (bootstrapError) {
-      const message = bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
-      setUser(null);
-      setConfigStatus("failed");
-      setError(message);
+      if (import.meta.env.DEV) {
+        setConfig({ authRequired: false, authConfigured: true });
+        setConfigStatus("loaded");
+        setUser({ email: "local-dev@remember-when.local" });
+        setError(null);
+      } else {
+        const message = bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
+        setUser(null);
+        setConfigStatus("failed");
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -109,13 +123,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       authRequired: config.authRequired,
       authConfigured: config.authConfigured,
+      hasAllowedEmailsKey: Boolean(config.hasAllowedEmailsKey),
       configStatus,
       error,
       loginWithGoogle,
       logout,
       getAccessToken: getStoredAccessToken
     }),
-    [config.authConfigured, config.authRequired, configStatus, error, loading, logout, user]
+    [config.authConfigured, config.authRequired, config.hasAllowedEmailsKey, configStatus, error, loading, logout, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

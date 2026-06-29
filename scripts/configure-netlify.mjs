@@ -69,6 +69,10 @@ if (localEnv.OPENAI_API_KEY) {
   envVars.OPENAI_API_KEY = localEnv.OPENAI_API_KEY;
 }
 
+if (localEnv.ALLOWED_EMAILS) {
+  envVars.ALLOWED_EMAILS = localEnv.ALLOWED_EMAILS;
+}
+
 const scopes = ["builds", "functions", "runtime", "post_processing"];
 const contexts = ["production", "deploy-preview", "branch-deploy", "dev"];
 
@@ -150,17 +154,23 @@ async function main() {
     delete envVars.OPENAI_API_KEY;
   }
 
+  if (!envVars.ALLOWED_EMAILS) {
+    if (existingKeys.has("ALLOWED_EMAILS")) {
+      console.log("Keeping existing ALLOWED_EMAILS from Netlify.");
+    } else {
+      console.log("WARNING: ALLOWED_EMAILS is missing locally and not yet set in Netlify.");
+    }
+  }
+
   for (const [key, value] of Object.entries(envVars)) {
     await upsertEnvVar(accountId, siteId, key, value);
     console.log(`Set ${key}`);
   }
 
-  const deploy = await netlifyRequest(`/api/v1/sites/${siteId}/deploys`, {
-    method: "POST",
-    body: JSON.stringify({ clear_cache: true })
-  });
-
-  console.log(`Deploy triggered: ${deploy.id} (${deploy.state})`);
+  console.log("\nNetlify env synced. Deploy manually when ready (no deploy was triggered):");
+  console.log("  1. Pause auto-builds in Netlify if you want to avoid surprise deploys.");
+  console.log("  2. Run: netlify deploy --prod");
+  console.log("  3. Verify /api/health shows hasAllowedEmailsKey:true and allowlistCount > 0.");
 }
 
 main().catch((error) => {

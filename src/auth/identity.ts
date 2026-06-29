@@ -8,6 +8,7 @@ export type AuthConfig = {
   authRequired: boolean;
   authConfigured: boolean;
   allowlistCount?: number;
+  hasAllowedEmailsKey?: boolean;
 };
 
 export type AuthConfigStatus = "loading" | "loaded" | "failed";
@@ -56,7 +57,8 @@ export async function fetchAuthConfig() {
   return {
     authRequired: Boolean(payload.authRequired),
     authConfigured: Boolean(payload.authConfigured),
-    allowlistCount: typeof payload.allowlistCount === "number" ? payload.allowlistCount : undefined
+    allowlistCount: typeof payload.allowlistCount === "number" ? payload.allowlistCount : undefined,
+    hasAllowedEmailsKey: Boolean(payload.hasAllowedEmailsKey)
   };
 }
 

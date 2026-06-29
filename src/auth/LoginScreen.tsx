@@ -2,7 +2,7 @@ import { Loader2, LogOut } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 
 export function LoginScreen() {
-  const { authConfigured, configStatus, error, loginWithGoogle } = useAuth();
+  const { authConfigured, configStatus, error, hasAllowedEmailsKey, loginWithGoogle } = useAuth();
 
   return (
     <main className="grid min-h-screen place-items-center px-5">
@@ -21,13 +21,15 @@ export function LoginScreen() {
 
           {configStatus === "failed" ? (
             <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
-              Could not reach the server to verify access control. Check your connection and try again, or redeploy
-              after updating Netlify environment variables.
+              {import.meta.env.DEV
+                ? "Could not reach the local API on port 8787. Run npm run dev:local from the project folder."
+                : "Could not reach the server to verify access control. Check your connection and try again, or redeploy after updating Netlify environment variables."}
             </div>
           ) : !authConfigured ? (
             <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
-              Access control is not configured yet. Add <code className="font-mono text-xs">ALLOWED_EMAILS</code> in
-              Netlify environment variables, then trigger a new deploy.
+              {hasAllowedEmailsKey
+                ? "ALLOWED_EMAILS is set but no valid addresses were found. Check comma-separated formatting in Netlify, then redeploy."
+                : "Access control is not configured yet. Add ALLOWED_EMAILS in Netlify environment variables with Functions scope, then redeploy."}
             </div>
           ) : null}
 
@@ -36,12 +38,19 @@ export function LoginScreen() {
           ) : null}
 
           <button
-            className="btn-primary"
+            className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
             disabled={configStatus !== "loaded" || !authConfigured}
             onClick={loginWithGoogle}
             type="button"
           >
-            Continue with Google
+            {configStatus === "loading" ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking access…
+              </>
+            ) : (
+              "Continue with Google"
+            )}
           </button>
         </div>
       </div>
@@ -51,6 +60,7 @@ export function LoginScreen() {
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { authRequired, loading, user } = useAuth();
+  const mustSignIn = import.meta.env.PROD || authRequired;
 
   if (loading) {
     return (
@@ -63,7 +73,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (authRequired && !user) {
+  if (mustSignIn && !user) {
     return <LoginScreen />;
   }
 

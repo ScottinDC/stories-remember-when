@@ -2,17 +2,43 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
-function envVar(name: "ALLOWED_EMAILS" | "AUTH_DISABLED" | "URL") {
-  // Dynamic access so Netlify's function bundler cannot inline build-time empties.
-  return process.env[name];
+type RuntimeEnvName =
+  | "ALLOWED_EMAILS"
+  | "AUTH_DISABLED"
+  | "URL"
+  | "NETLIFY"
+  | "AWS_LAMBDA_FUNCTION_NAME";
+
+// Split keys so esbuild/Netlify bundlers cannot inline build-time empties.
+const RUNTIME_ENV_KEY: Record<RuntimeEnvName, string> = {
+  ALLOWED_EMAILS: "ALLOW" + "ED_EMAILS",
+  AUTH_DISABLED: "AUTH" + "_DISABLED",
+  URL: "UR" + "L",
+  NETLIFY: "NET" + "LIFY",
+  AWS_LAMBDA_FUNCTION_NAME: "AWS" + "_LAMBDA_FUNCTION_NAME"
+};
+
+function readRuntimeEnv(name: RuntimeEnvName) {
+  const env = globalThis.process?.env;
+  if (!env) {
+    return undefined;
+  }
+  return env[RUNTIME_ENV_KEY[name]];
+}
+
+function isNetlifyRuntime() {
+  return readRuntimeEnv("NETLIFY") === "true" || Boolean(readRuntimeEnv("AWS_LAMBDA_FUNCTION_NAME"));
 }
 
 export function isAuthDisabled() {
-  return envVar("AUTH_DISABLED") === "true";
+  if (isNetlifyRuntime()) {
+    return false;
+  }
+  return readRuntimeEnv("AUTH_DISABLED") === "true";
 }
 
 export function getAllowedEmails() {
-  const raw = envVar("ALLOWED_EMAILS") ?? "";
+  const raw = readRuntimeEnv("ALLOWED_EMAILS") ?? "";
   return raw
     .split(",")
     .map((email) => email.trim().toLowerCase())
@@ -28,7 +54,7 @@ export function isEmailAllowed(email: string) {
 }
 
 function resolveSiteUrl(requestUrl?: string) {
-  const siteUrl = envVar("URL");
+  const siteUrl = readRuntimeEnv("URL");
   if (siteUrl) {
     return siteUrl.replace(/\/$/, "");
   }
@@ -116,10 +142,12 @@ export async function requireAuth(authHeader: string | null | undefined, request
 
 export function authConfig() {
   const disabled = isAuthDisabled();
+  const hasAllowedEmailsKey = Boolean(readRuntimeEnv("ALLOWED_EMAILS"));
   const allowlistCount = getAllowedEmails().length;
   return {
     authRequired: !disabled,
     authConfigured: disabled || allowlistCount > 0,
-    allowlistCount
+    allowlistCount,
+    hasAllowedEmailsKey
   };
 }
