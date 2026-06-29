@@ -12,7 +12,7 @@ if (existsSync(localEnv)) {
 import cors from "cors";
 import express from "express";
 import multer from "multer";
-import { handleGetInterview, handleHealth, handlePostAnswer } from "./handlers";
+import { handleDeleteAnswer, handleGetInterview, handleHealth, handlePostAnswer } from "./handlers";
 
 const app = express();
 const upload = multer({
@@ -56,6 +56,15 @@ app.post("/api/responses/:questionId/answer", upload.single("audio"), async (req
       sourceByteLength: req.file.size
     });
 
+    res.status(result.status).json(result.body);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/responses/:questionId/answer", async (req, res, next) => {
+  try {
+    const result = await handleDeleteAnswer(String(req.params.questionId));
     res.status(result.status).json(result.body);
   } catch (error) {
     next(error);

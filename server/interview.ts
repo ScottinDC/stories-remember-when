@@ -65,13 +65,16 @@ export function buildOralHistorianPrompt(nodes: MemoryNode[], answeredNode: Memo
           biography: BIOGRAPHY,
           mostRecentAnswer: {
             questionId: answeredNode.id,
+            sequenceOrder: answeredNode.sequenceOrder,
+            depth: answeredNode.depth,
+            treePath: answeredNode.treePath,
             question: answeredNode.question,
             transcript: answeredNode.transcript
           },
           answeredConversation: answered,
           unansweredFoundationalQuestions: pendingQuestions,
           instruction:
-            "Return the single best follow-up question only. Do not include labels, explanation, numbering, or quotation marks."
+            "Return the single best follow-up question only, guided by the most recent answer and where it sits in the question tree. Do not include labels, explanation, numbering, or quotation marks."
         },
         null,
         2

@@ -1,6 +1,6 @@
 import type { Context } from "@netlify/functions";
 import { markNodeFailed } from "../../server/db";
-import { finishBackgroundAnswer, handleGetInterview, handleHealth, handlePostAnswerBackground } from "../../server/handlers";
+import { handleDeleteAnswer, finishBackgroundAnswer, handleGetInterview, handleHealth, handlePostAnswerBackground } from "../../server/handlers";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -30,6 +30,12 @@ export default async (req: Request, context: Context) => {
     }
 
     const answerMatch = path.match(/^\/api\/responses\/([^/]+)\/answer$/);
+
+    if (req.method === "DELETE" && answerMatch) {
+      const result = await handleDeleteAnswer(answerMatch[1]);
+      return json(result.body, result.status);
+    }
+
     if (req.method === "POST" && answerMatch) {
       const formData = await req.formData();
       const audio = formData.get("audio");

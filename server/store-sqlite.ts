@@ -3,6 +3,7 @@ import path from "node:path";
 import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { INITIAL_QUESTIONS } from "./interview";
+import { buildTreePath, enrichNode, nodeDepth } from "./tree";
 import type { InterviewState, InterviewThread, MemoryNode } from "./types";
 
 const databasePath = process.env.DATABASE_PATH ?? "./data/remember-when.sqlite";
@@ -44,8 +45,8 @@ function rowToThread(row: Record<string, string>): InterviewThread {
   };
 }
 
-function rowToNode(row: Record<string, string | null>): MemoryNode {
-  return {
+function rowToNode(row: Record<string, string | null>, nodes: MemoryNode[], index: number): MemoryNode {
+  const base: MemoryNode = {
     id: row.id as string,
     threadId: row.thread_id as string,
     parentQuestionId: row.parent_question_id,
@@ -55,8 +56,33 @@ function rowToNode(row: Record<string, string | null>): MemoryNode {
     gcsObjectName: row.gcs_object_name,
     timestamp: row.timestamp as string,
     metadata: row.metadata ? (JSON.parse(row.metadata) as Record<string, unknown>) : null,
-    status: row.status as MemoryNode["status"]
+    status: row.status as MemoryNode["status"],
+    sequenceOrder: index + 1,
+    depth: 0,
+    treePath: [row.id as string]
   };
+  const depth = nodeDepth(nodes.length ? nodes : [base], base);
+  const treePath = buildTreePath(nodes.length ? nodes : [base], base);
+  return enrichNode(nodes.length ? nodes : [base], { ...base, depth, treePath });
+}
+
+function hydrateNodes(rows: Record<string, string | null>[]) {
+  const preliminary = rows.map((row, index) => ({
+    id: row.id as string,
+    threadId: row.thread_id as string,
+    parentQuestionId: row.parent_question_id,
+    question: row.question as string,
+    transcript: row.transcript,
+    mp3Url: row.mp3_url,
+    gcsObjectName: row.gcs_object_name,
+    timestamp: row.timestamp as string,
+    metadata: row.metadata ? (JSON.parse(row.metadata) as Record<string, unknown>) : null,
+    status: row.status as MemoryNode["status"],
+    sequenceOrder: index + 1,
+    depth: 0,
+    treePath: [row.id as string]
+  }));
+  return preliminary.map((node, index) => rowToNode(rows[index], preliminary, index));
 }
 
 export async function getOrCreateDefaultThread(): Promise<InterviewState> {
@@ -99,7 +125,7 @@ export async function getThreadState(threadId: string): Promise<InterviewState> 
 
   return {
     thread: rowToThread(thread),
-    nodes: rows.map(rowToNode)
+    nodes: hydrateNodes(rows)
   };
 }
 
@@ -107,7 +133,7 @@ export async function getNode(id: string): Promise<MemoryNode | undefined> {
   const row = db.prepare("SELECT * FROM responses WHERE id = ?").get(id) as
     | Record<string, string | null>
     | undefined;
-  return row ? rowToNode(row) : undefined;
+  return row ? hydrateNodes([row])[0] : undefined;
 }
 
 export async function markNodeProcessing(input: {
@@ -207,5 +233,21 @@ export async function addFollowUpQuestion(input: {
     input.metadata ? JSON.stringify(input.metadata) : null
   );
   db.prepare("UPDATE threads SET updated_at = ? WHERE id = ?").run(now, input.threadId);
-  return getNode(id);
+  const state = await getThreadState(input.threadId);
+  return state.nodes.find((node) => node.id === id) ?? undefined;
+}
+
+export async function clearNodeAnswer(id: string) {
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE responses
+     SET transcript = NULL, mp3_url = NULL, gcs_object_name = NULL, timestamp = ?, metadata = NULL, status = 'pending'
+     WHERE id = ?`
+  ).run(now, id);
+
+  const node = await getNode(id);
+  if (node) {
+    db.prepare("UPDATE threads SET updated_at = ? WHERE id = ?").run(now, node.threadId);
+  }
+  return node;
 }

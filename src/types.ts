@@ -9,6 +9,9 @@ export type MemoryNode = {
   timestamp: string;
   metadata: Record<string, unknown> | null;
   status: "pending" | "processing" | "answered";
+  sequenceOrder: number;
+  depth: number;
+  treePath: string[];
 };
 
 export type InterviewThread = {
@@ -21,4 +24,10 @@ export type InterviewThread = {
 export type InterviewState = {
   thread: InterviewThread;
   nodes: MemoryNode[];
+};
+
+export type QueuedRecording = {
+  questionId: string;
+  blob: Blob;
+  url: string;
 };

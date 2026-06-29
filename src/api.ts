@@ -63,3 +63,33 @@ export async function saveAnswer(questionId: string, audio: Blob) {
 
   return { state: result.state };
 }
+
+export async function deleteAnswer(questionId: string) {
+  const response = await fetch(`/api/responses/${questionId}/answer`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const error = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(error?.error ?? "Could not delete the answer.");
+  }
+
+  const result = (await response.json()) as { state?: InterviewState };
+  if (!result.state) {
+    throw new Error("Could not delete the answer.");
+  }
+
+  return { state: result.state };
+}
+
+export async function saveAllAnswers(entries: Array<{ questionId: string; blob: Blob }>) {
+  let state: InterviewState | null = null;
+  for (const entry of entries) {
+    const result = await saveAnswer(entry.questionId, entry.blob);
+    state = result.state;
+  }
+  if (!state) {
+    throw new Error("No answers were saved.");
+  }
+  return { state };
+}

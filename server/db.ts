@@ -59,3 +59,7 @@ export async function addFollowUpQuestion(input: {
 }) {
   return (await store()).addFollowUpQuestion(input);
 }
+
+export async function clearNodeAnswer(id: string) {
+  return (await store()).clearNodeAnswer(id);
+}

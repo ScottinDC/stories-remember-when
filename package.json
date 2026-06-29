@@ -19,6 +19,8 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
+    "d3": "^7.9.0",
+    "d3-sankey": "^0.12.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "lucide-react": "^0.468.0",
@@ -32,6 +34,8 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/cors": "^2.8.17",
+    "@types/d3": "^7.4.3",
+    "@types/d3-sankey": "^0.12.5",
     "@types/express": "^5.0.0",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.5",

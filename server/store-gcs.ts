@@ -1,12 +1,30 @@
 import { randomUUID } from "node:crypto";
 import { INITIAL_QUESTIONS } from "./interview";
 import { readJsonFromGcs, writeJsonToGcs } from "./storage";
+import { buildTreePath, enrichNode, nextSequenceOrder, nodeDepth } from "./tree";
 import type { InterviewState, InterviewThread, MemoryNode } from "./types";
 
 const STATE_OBJECT = "app/interview-state.json";
 
+function normalizeNode(nodes: MemoryNode[], node: MemoryNode, index: number): MemoryNode {
+  const sequenceOrder = node.sequenceOrder ?? index + 1;
+  const withOrder = { ...node, sequenceOrder };
+  const depth = node.depth ?? nodeDepth(nodes, withOrder);
+  const treePath = node.treePath ?? buildTreePath(nodes, withOrder);
+  return { ...withOrder, depth, treePath };
+}
+
+function normalizeState(state: InterviewState): InterviewState {
+  const nodes = state.nodes.map((node, index) => normalizeNode(state.nodes, node, index));
+  return {
+    thread: state.thread,
+    nodes: nodes.map((node) => normalizeNode(nodes, node, node.sequenceOrder - 1))
+  };
+}
+
 async function loadState(): Promise<InterviewState | null> {
-  return readJsonFromGcs<InterviewState>(STATE_OBJECT);
+  const raw = await readJsonFromGcs<InterviewState>(STATE_OBJECT);
+  return raw ? normalizeState(raw) : null;
 }
 
 async function persistState(state: InterviewState) {
@@ -23,18 +41,24 @@ function createInitialState(): InterviewState {
     updatedAt: now
   };
 
-  const nodes: MemoryNode[] = INITIAL_QUESTIONS.map((question) => ({
-    id: randomUUID(),
-    threadId,
-    parentQuestionId: null,
-    question,
-    transcript: null,
-    mp3Url: null,
-    gcsObjectName: null,
-    timestamp: now,
-    metadata: null,
-    status: "pending"
-  }));
+  const nodes: MemoryNode[] = INITIAL_QUESTIONS.map((question, index) => {
+    const id = randomUUID();
+    return {
+      id,
+      threadId,
+      parentQuestionId: null,
+      question,
+      transcript: null,
+      mp3Url: null,
+      gcsObjectName: null,
+      timestamp: now,
+      metadata: null,
+      status: "pending",
+      sequenceOrder: index + 1,
+      depth: 0,
+      treePath: [id]
+    };
+  });
 
   return { thread, nodes };
 }
@@ -80,14 +104,14 @@ export async function markNodeProcessing(input: {
     return undefined;
   }
 
-  state.nodes[index] = {
+  state.nodes[index] = enrichNode(state.nodes, {
     ...state.nodes[index],
     mp3Url: input.mp3Url,
     gcsObjectName: input.gcsObjectName,
     timestamp: now,
     metadata: input.metadata,
     status: "processing"
-  };
+  });
   state.thread.updatedAt = now;
   await persistState(state);
   return state.nodes[index];
@@ -111,7 +135,7 @@ export async function markNodeAnswered(input: {
     return undefined;
   }
 
-  state.nodes[index] = {
+  state.nodes[index] = enrichNode(state.nodes, {
     ...state.nodes[index],
     transcript: input.transcript,
     mp3Url: input.mp3Url,
@@ -119,7 +143,7 @@ export async function markNodeAnswered(input: {
     timestamp: now,
     metadata: input.metadata,
     status: "answered"
-  };
+  });
   state.thread.updatedAt = now;
   await persistState(state);
   return state.nodes[index];
@@ -137,7 +161,7 @@ export async function markNodeFailed(id: string, message: string) {
     return undefined;
   }
 
-  state.nodes[index] = {
+  state.nodes[index] = enrichNode(state.nodes, {
     ...state.nodes[index],
     timestamp: now,
     metadata: {
@@ -145,7 +169,33 @@ export async function markNodeFailed(id: string, message: string) {
       error: message
     },
     status: "pending"
-  };
+  });
+  state.thread.updatedAt = now;
+  await persistState(state);
+  return state.nodes[index];
+}
+
+export async function clearNodeAnswer(id: string) {
+  const state = await loadState();
+  if (!state) {
+    return undefined;
+  }
+
+  const now = new Date().toISOString();
+  const index = state.nodes.findIndex((node) => node.id === id);
+  if (index === -1) {
+    return undefined;
+  }
+
+  state.nodes[index] = enrichNode(state.nodes, {
+    ...state.nodes[index],
+    transcript: null,
+    mp3Url: null,
+    gcsObjectName: null,
+    timestamp: now,
+    metadata: null,
+    status: "pending"
+  });
   state.thread.updatedAt = now;
   await persistState(state);
   return state.nodes[index];
@@ -162,9 +212,19 @@ export async function addFollowUpQuestion(input: {
     return undefined;
   }
 
+  const parent = state.nodes.find((node) => node.id === input.parentQuestionId);
+  if (!parent) {
+    return undefined;
+  }
+
   const now = new Date().toISOString();
+  const id = randomUUID();
+  const sequenceOrder = nextSequenceOrder(state.nodes);
+  const depth = parent.depth + 1;
+  const treePath = [...parent.treePath, id];
+
   const node: MemoryNode = {
-    id: randomUUID(),
+    id,
     threadId: input.threadId,
     parentQuestionId: input.parentQuestionId,
     question: input.question,
@@ -173,7 +233,10 @@ export async function addFollowUpQuestion(input: {
     gcsObjectName: null,
     timestamp: now,
     metadata: input.metadata ?? null,
-    status: "pending"
+    status: "pending",
+    sequenceOrder,
+    depth,
+    treePath
   };
 
   state.nodes.push(node);

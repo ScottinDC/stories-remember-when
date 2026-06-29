@@ -1,5 +1,6 @@
 import {
   addFollowUpQuestion,
+  clearNodeAnswer,
   getNode,
   getOrCreateDefaultThread,
   getThreadState,
@@ -8,7 +9,7 @@ import {
 } from "./db";
 import { generateFollowUp, transcribeAudio } from "./ai";
 import { prepareAudioForUpload } from "./audio";
-import { uploadAudioToGcs } from "./storage";
+import { deleteAnswerArtifacts, uploadAudioToGcs, writeAnswerManifest } from "./storage";
 
 export async function handleHealth() {
   return { ok: true };
@@ -18,7 +19,7 @@ export async function handleGetInterview() {
   return getOrCreateDefaultThread();
 }
 
-export async function handlePostAnswer(input: {
+async function saveAnswerForNode(input: {
   questionId: string;
   audioBuffer: Buffer;
   mimeType: string;
@@ -34,7 +35,7 @@ export async function handlePostAnswer(input: {
   const uploaded = await uploadAudioToGcs({
     buffer: prepared.buffer,
     threadId: node.threadId,
-    questionId: node.id,
+    node,
     extension: prepared.extension,
     contentType: prepared.contentType
   });
@@ -44,7 +45,10 @@ export async function handlePostAnswer(input: {
     mimeType: input.mimeType,
     sourceByteLength: input.sourceByteLength,
     audioByteLength: prepared.buffer.byteLength,
-    audioFormat: prepared.extension
+    audioFormat: prepared.extension,
+    sequenceOrder: node.sequenceOrder,
+    depth: node.depth,
+    treePath: node.treePath
   };
 
   const transcript = await transcribeAudio(prepared.buffer, prepared.filename, prepared.contentType);
@@ -60,6 +64,11 @@ export async function handlePostAnswer(input: {
     return { status: 500 as const, body: { error: "Could not save response." } };
   }
 
+  await writeAnswerManifest({
+    node: answeredNode,
+    audioObjectName: uploaded.objectName
+  });
+
   const currentState = await getThreadState(answeredNode.threadId);
   const followUpQuestion = await generateFollowUp(currentState.nodes, answeredNode);
   const followUpNode = await addFollowUpQuestion({
@@ -67,7 +76,8 @@ export async function handlePostAnswer(input: {
     parentQuestionId: answeredNode.id,
     question: followUpQuestion,
     metadata: {
-      generatedBy: process.env.OPENAI_MODEL ?? "gpt-4.1-mini"
+      generatedBy: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+      guidedByAnswerId: answeredNode.id
     }
   });
 
@@ -78,6 +88,39 @@ export async function handlePostAnswer(input: {
       answeredNode,
       followUpNode,
       state: await getThreadState(answeredNode.threadId)
+    }
+  };
+}
+
+export async function handlePostAnswer(input: {
+  questionId: string;
+  audioBuffer: Buffer;
+  mimeType: string;
+  originalFilename: string;
+  sourceByteLength: number;
+}) {
+  return saveAnswerForNode(input);
+}
+
+export async function handleDeleteAnswer(questionId: string) {
+  const node = await getNode(questionId);
+  if (!node) {
+    return { status: 404 as const, body: { error: "Question not found." } };
+  }
+
+  if (node.gcsObjectName || node.status === "answered") {
+    await deleteAnswerArtifacts(node.threadId, node);
+  }
+
+  const cleared = await clearNodeAnswer(questionId);
+  if (!cleared) {
+    return { status: 500 as const, body: { error: "Could not delete the answer." } };
+  }
+
+  return {
+    status: 200 as const,
+    body: {
+      state: await getThreadState(node.threadId)
     }
   };
 }
@@ -98,7 +141,7 @@ export async function handlePostAnswerBackground(input: {
   const uploaded = await uploadAudioToGcs({
     buffer: prepared.buffer,
     threadId: node.threadId,
-    questionId: node.id,
+    node,
     extension: prepared.extension,
     contentType: prepared.contentType
   });
@@ -112,7 +155,10 @@ export async function handlePostAnswerBackground(input: {
       mimeType: input.mimeType,
       sourceByteLength: input.sourceByteLength,
       audioByteLength: prepared.buffer.byteLength,
-      audioFormat: prepared.extension
+      audioFormat: prepared.extension,
+      sequenceOrder: node.sequenceOrder,
+      depth: node.depth,
+      treePath: node.treePath
     }
   });
 
@@ -146,7 +192,10 @@ export async function finishBackgroundAnswer(input: {
     mimeType: input.mimeType,
     sourceByteLength: input.sourceByteLength,
     audioByteLength: input.prepared.buffer.byteLength,
-    audioFormat: input.prepared.extension
+    audioFormat: input.prepared.extension,
+    sequenceOrder: node.sequenceOrder,
+    depth: node.depth,
+    treePath: node.treePath
   };
 
   const transcript = await transcribeAudio(
@@ -166,6 +215,11 @@ export async function finishBackgroundAnswer(input: {
     return;
   }
 
+  await writeAnswerManifest({
+    node: answeredNode,
+    audioObjectName: input.uploaded.objectName
+  });
+
   const currentState = await getThreadState(answeredNode.threadId);
   const followUpQuestion = await generateFollowUp(currentState.nodes, answeredNode);
   await addFollowUpQuestion({
@@ -173,7 +227,8 @@ export async function finishBackgroundAnswer(input: {
     parentQuestionId: answeredNode.id,
     question: followUpQuestion,
     metadata: {
-      generatedBy: process.env.OPENAI_MODEL ?? "gpt-4.1-mini"
+      generatedBy: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+      guidedByAnswerId: answeredNode.id
     }
   });
 }

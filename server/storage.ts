@@ -1,15 +1,12 @@
-import { randomUUID } from "node:crypto";
 import { getBucketName, getStorageClient } from "./gcs-client";
+import { seriesPrefix } from "./tree";
+import type { AnswerManifest, MemoryNode } from "./types";
 
 export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> {
   const storage = getStorageClient();
   const file = storage.bucket(getBucketName()).file(objectName);
 
   try {
-    const [exists] = await file.exists();
-    if (!exists) {
-      return null;
-    }
     const [contents] = await file.download();
     return JSON.parse(contents.toString("utf8")) as T;
   } catch {
@@ -26,17 +23,32 @@ export async function writeJsonToGcs(objectName: string, value: unknown) {
   });
 }
 
+export async function deleteGcsObject(objectName: string) {
+  const storage = getStorageClient();
+  const file = storage.bucket(getBucketName()).file(objectName);
+  try {
+    await file.delete({ ignoreNotFound: true });
+  } catch {
+    // ignore missing objects
+  }
+}
+
+function seriesBasePath(threadId: string, node: MemoryNode) {
+  return `threads/${threadId}/series/${seriesPrefix(node)}`;
+}
+
 export async function uploadAudioToGcs(input: {
   buffer: Buffer;
   threadId: string;
-  questionId: string;
+  node: MemoryNode;
   extension?: string;
   contentType?: string;
 }) {
   const extension = input.extension ?? "webm";
   const contentType = input.contentType ?? "audio/webm";
   const storage = getStorageClient();
-  const objectName = `threads/${input.threadId}/${input.questionId}/${Date.now()}-${randomUUID()}.${extension}`;
+  const basePath = seriesBasePath(input.threadId, input.node);
+  const objectName = `${basePath}/answer.${extension}`;
   const file = storage.bucket(getBucketName()).file(objectName);
 
   await file.save(input.buffer, {
@@ -45,11 +57,12 @@ export async function uploadAudioToGcs(input: {
     metadata: {
       metadata: {
         threadId: input.threadId,
-        questionId: input.questionId
+        questionId: input.node.id,
+        parentQuestionId: input.node.parentQuestionId ?? "",
+        sequenceOrder: String(input.node.sequenceOrder),
+        depth: String(input.node.depth),
+        treePath: input.node.treePath.join("/")
       }
-    },
-    preconditionOpts: {
-      ifGenerationMatch: 0
     }
   });
 
@@ -63,4 +76,35 @@ export async function uploadAudioToGcs(input: {
     objectName,
     url: signedUrl
   };
+}
+
+export async function writeAnswerManifest(input: {
+  node: MemoryNode;
+  audioObjectName: string | null;
+}) {
+  const manifest: AnswerManifest = {
+    threadId: input.node.threadId,
+    questionId: input.node.id,
+    parentQuestionId: input.node.parentQuestionId,
+    sequenceOrder: input.node.sequenceOrder,
+    depth: input.node.depth,
+    treePath: input.node.treePath,
+    question: input.node.question,
+    status: input.node.status,
+    transcript: input.node.transcript,
+    audioObjectName: input.audioObjectName,
+    updatedAt: new Date().toISOString()
+  };
+
+  const objectName = `${seriesBasePath(input.node.threadId, input.node)}/manifest.json`;
+  await writeJsonToGcs(objectName, manifest);
+  return objectName;
+}
+
+export async function deleteAnswerArtifacts(threadId: string, node: MemoryNode) {
+  const basePath = seriesBasePath(threadId, node);
+  await deleteGcsObject(`${basePath}/manifest.json`);
+  if (node.gcsObjectName) {
+    await deleteGcsObject(node.gcsObjectName);
+  }
 }
