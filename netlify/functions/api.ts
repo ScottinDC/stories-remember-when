@@ -32,7 +32,7 @@ export default async (req: Request, context: Context) => {
       return json(await handleHealth());
     }
 
-    const auth = await requireAuth(req.headers.get("authorization"), req.url, req);
+    const auth = await requireAuth(req.headers.get("authorization"), req.url, req, context);
     if ("status" in auth) {
       return json({ error: auth.error }, auth.status);
     }
@@ -102,5 +102,6 @@ export default async (req: Request, context: Context) => {
 };
 
 export const config = {
-  path: "/api/*"
+  path: "/api/*",
+  preferStatic: false
 };

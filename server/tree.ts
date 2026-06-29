@@ -41,8 +41,13 @@ export function resolveBranchRootId(nodes: MemoryNode[], node: MemoryNode) {
     return node.id;
   }
 
+  const visited = new Set<string>();
   let current: MemoryNode | undefined = node;
   while (current?.parentQuestionId) {
+    if (visited.has(current.id)) {
+      break;
+    }
+    visited.add(current.id);
     const parent = nodes.find((candidate) => candidate.id === current!.parentQuestionId);
     if (!parent) {
       break;

@@ -44,9 +44,31 @@ export function App() {
       <main className="grid min-h-screen place-items-center px-4">
         <div className="flex max-w-md flex-col items-center gap-4 text-center">
           <p className="text-base text-[#9b2c2c]">{error ?? "Could not load the interview."}</p>
-          <button className="btn-secondary" onClick={() => void logout({ error: null })} type="button">
-            Sign out and try again
-          </button>
+          <div className="flex w-full flex-col gap-3">
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                fetchInterview()
+                  .then(setState)
+                  .catch(async (err: unknown) => {
+                    if (err instanceof ApiAuthError) {
+                      await logout({ error: err.message });
+                      return;
+                    }
+                    setError(err instanceof Error ? err.message : "Could not load the interview.");
+                  })
+                  .finally(() => setLoading(false));
+              }}
+              type="button"
+            >
+              Try again
+            </button>
+            <button className="btn-secondary" onClick={() => void logout({ error: null })} type="button">
+              Sign out and try again
+            </button>
+          </div>
         </div>
       </main>
     );

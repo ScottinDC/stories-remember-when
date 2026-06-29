@@ -1,3 +1,4 @@
+import { getContext } from "@netlify/functions";
 import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
 
 type NetlifyIdentityContext = {
@@ -19,10 +20,19 @@ type NetlifyGlobals = {
   };
 };
 
+type AuthRequestContext = {
+  cookies?: {
+    get?: (name: string) => string | undefined;
+  };
+};
+
 type AccessTokenClaims = {
   email?: string;
   exp?: number;
   user_metadata?: {
+    email?: string;
+  };
+  app_metadata?: {
     email?: string;
   };
 };
@@ -38,6 +48,17 @@ function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
   } catch {
     return null;
   }
+}
+
+function emailFromClaims(claims: AccessTokenClaims | null) {
+  if (!claims) {
+    return undefined;
+  }
+  return (
+    claims.email ??
+    (typeof claims.user_metadata?.email === "string" ? claims.user_metadata.email : undefined) ??
+    (typeof claims.app_metadata?.email === "string" ? claims.app_metadata.email : undefined)
+  );
 }
 
 export function isAuthDisabled() {
@@ -71,11 +92,6 @@ export function extractBearerToken(headerValue: string | null | undefined) {
   return token || null;
 }
 
-function getNetlifyIdentityContext(): NetlifyIdentityContext | null {
-  const context = (globalThis as NetlifyGlobals).netlifyIdentityContext;
-  return context ?? null;
-}
-
 function readCookieHeader(cookieHeader: string | null | undefined, name: string) {
   if (!cookieHeader) {
     return null;
@@ -93,36 +109,45 @@ function readCookieHeader(cookieHeader: string | null | undefined, name: string)
   }
 }
 
-function readServerJwt(req?: Request) {
+function readRuntimeCookie(name: string, requestContext?: AuthRequestContext) {
+  try {
+    const fromHandler = requestContext?.cookies?.get?.(name);
+    if (fromHandler) {
+      return fromHandler;
+    }
+  } catch {
+    // Ignore cookie API failures and fall back to request parsing.
+  }
+
+  try {
+    const fromGetContext = getContext().cookies?.get?.(name);
+    if (fromGetContext) {
+      return fromGetContext;
+    }
+  } catch {
+    // getContext is only valid during an active request.
+  }
+
+  return (globalThis as NetlifyGlobals).Netlify?.context?.cookies?.get?.(name) ?? null;
+}
+
+function readServerJwt(req?: Request, requestContext?: AuthRequestContext) {
   const bearer = extractBearerToken(req?.headers.get("authorization"));
   if (bearer) {
     return bearer;
   }
 
-  const netlifyCookies = (globalThis as NetlifyGlobals).Netlify?.context?.cookies;
-  const fromRuntime = netlifyCookies?.get?.("nf_jwt");
+  const fromRuntime = readRuntimeCookie("nf_jwt", requestContext);
   if (fromRuntime) {
     return fromRuntime;
   }
 
-  const fromCookieHeader = readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
-  if (fromCookieHeader) {
-    return fromCookieHeader;
-  }
-
-  const identityContext = getNetlifyIdentityContext();
-  if (identityContext?.user?.email && identityContext.token) {
-    return identityContext.token;
-  }
-
-  return null;
+  return readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
 }
 
 function emailFromJwt(token: string) {
   const claims = decodeAccessTokenClaims(token);
-  const email =
-    claims?.email ??
-    (typeof claims?.user_metadata?.email === "string" ? claims.user_metadata.email : undefined);
+  const email = emailFromClaims(claims);
   if (!email) {
     throw new Error("Token is missing an email claim.");
   }
@@ -134,17 +159,8 @@ function emailFromJwt(token: string) {
   return email;
 }
 
-function resolveAuthenticatedEmail(req?: Request): string {
-  const identityContext = getNetlifyIdentityContext();
-  if (identityContext?.user?.email) {
-    const exp = identityContext.user.exp;
-    if (exp && exp < Math.floor(Date.now() / 1000)) {
-      throw new Error("Invalid or expired sign-in.");
-    }
-    return identityContext.user.email;
-  }
-
-  const token = readServerJwt(req);
+function resolveAuthenticatedEmail(req?: Request, requestContext?: AuthRequestContext): string {
+  const token = readServerJwt(req, requestContext);
   if (!token) {
     throw new Error("Sign in required.");
   }
@@ -159,7 +175,8 @@ export type AuthResult =
 export async function requireAuth(
   authHeader: string | null | undefined,
   _requestUrl?: string,
-  req?: Request
+  req?: Request,
+  requestContext?: AuthRequestContext
 ): Promise<AuthResult> {
   if (isAuthDisabled()) {
     return { email: "local-dev@remember-when.local" };
@@ -167,7 +184,7 @@ export async function requireAuth(
 
   try {
     const email = req
-      ? resolveAuthenticatedEmail(req)
+      ? resolveAuthenticatedEmail(req, requestContext)
       : emailFromJwt(extractBearerToken(authHeader) ?? (() => { throw new Error("Sign in required."); })());
     if (!isEmailAllowed(email)) {
       return {

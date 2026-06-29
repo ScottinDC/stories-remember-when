@@ -2,7 +2,7 @@ import { getBucketName, getStorageClient } from "./gcs-client";
 import { seriesPrefix } from "./tree";
 import type { AnswerManifest, MemoryNode } from "./types";
 
-const GCS_OPERATION_TIMEOUT_MS = 20_000;
+const GCS_OPERATION_TIMEOUT_MS = 8_000;
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;

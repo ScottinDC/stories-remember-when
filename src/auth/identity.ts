@@ -19,7 +19,34 @@ type AccessTokenClaims = {
   user_metadata?: {
     email?: string;
   };
+  app_metadata?: {
+    email?: string;
+  };
 };
+
+function readCookieToken(name: string) {
+  const match = new RegExp(`(?:^|;\\s*)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=([^;]*)`).exec(document.cookie);
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function emailFromClaims(claims: AccessTokenClaims | null) {
+  if (!claims) {
+    return undefined;
+  }
+  return (
+    claims.email ??
+    (typeof claims.user_metadata?.email === "string" ? claims.user_metadata.email : undefined) ??
+    (typeof claims.app_metadata?.email === "string" ? claims.app_metadata.email : undefined)
+  );
+}
 
 function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
   try {
@@ -36,9 +63,7 @@ function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
 
 export function userFromAccessToken(token: string): AuthUser | null {
   const claims = decodeAccessTokenClaims(token);
-  const email =
-    claims?.email ??
-    (typeof claims?.user_metadata?.email === "string" ? claims.user_metadata.email : undefined);
+  const email = emailFromClaims(claims);
   if (!email) {
     return null;
   }
@@ -83,8 +108,10 @@ export function getStoredAccessToken() {
   const stored = sessionStorage.getItem(TOKEN_STORAGE_KEY);
   if (stored) {
     storeAccessToken(stored);
+    return stored;
   }
-  return stored;
+
+  return readCookieToken("nf_jwt");
 }
 
 export function hasStoredSession() {

@@ -20,6 +20,7 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, {
     ...init,
     credentials: "include",
+    cache: "no-store",
     headers: {
       ...authHeaders(),
       ...(init?.headers ?? {})
@@ -61,22 +62,48 @@ async function pollInterview(questionId: string, attempts = 60): Promise<Intervi
 }
 
 export async function fetchInterview() {
-  const response = await apiFetch("/api/interview");
-  if (!response.ok) {
-    const body = await response.text();
-    if (/Internal Error/i.test(body)) {
-      throw new Error("The server had trouble loading the interview. Use “Clear session and try again” on the sign-in screen.");
-    }
-    let message: string | undefined;
+  const attempts = 3;
+  let lastError: Error | null = null;
+
+  for (let index = 0; index < attempts; index += 1) {
     try {
-      const error = JSON.parse(body) as { error?: string };
-      message = error.error;
-    } catch {
-      message = body.trim() || undefined;
+      const response = await apiFetch("/api/interview");
+      if (!response.ok) {
+        const body = await response.text();
+        if (/Internal Error/i.test(body)) {
+          throw new Error("INTERVIEW_INTERNAL_ERROR");
+        }
+        let message: string | undefined;
+        try {
+          const error = JSON.parse(body) as { error?: string };
+          message = error.error;
+        } catch {
+          message = body.trim() || undefined;
+        }
+        throw new Error(message ?? `Could not load the interview (${response.status}).`);
+      }
+      return (await response.json()) as InterviewState;
+    } catch (error) {
+      if (error instanceof ApiAuthError) {
+        throw error;
+      }
+      lastError = error instanceof Error ? error : new Error("Could not load the interview.");
+      const shouldRetry =
+        lastError.message === "INTERVIEW_INTERNAL_ERROR" ||
+        lastError.message.includes("Could not load the interview (5");
+      if (!shouldRetry || index === attempts - 1) {
+        if (lastError.message === "INTERVIEW_INTERNAL_ERROR") {
+          throw new Error(
+            "The server had trouble loading the interview. Use “Clear session and try again” on the sign-in screen."
+          );
+        }
+        throw lastError;
+      }
+      await sleep(1000 * (index + 1));
     }
-    throw new Error(message ?? `Could not load the interview (${response.status}).`);
   }
-  return (await response.json()) as InterviewState;
+
+  throw lastError ?? new Error("Could not load the interview.");
 }
 
 export async function saveAnswer(questionId: string, audio: Blob) {

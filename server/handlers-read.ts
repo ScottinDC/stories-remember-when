@@ -1,7 +1,10 @@
 import { authConfig } from "./auth";
 import { storageConfig } from "./runtime-env";
 import { readJsonFromGcs } from "./storage";
-import { getOrCreateDefaultThread } from "./db";
+import { getOrCreateDefaultThread } from "./store-gcs";
+
+const CACHE_TTL_MS = 15_000;
+let cachedInterview: { value: Awaited<ReturnType<typeof getOrCreateDefaultThread>>; at: number } | null = null;
 
 export async function handleHealth() {
   const storage = storageConfig();
@@ -27,5 +30,11 @@ export async function handleHealth() {
 }
 
 export async function handleGetInterview() {
-  return getOrCreateDefaultThread();
+  if (cachedInterview && Date.now() - cachedInterview.at < CACHE_TTL_MS) {
+    return cachedInterview.value;
+  }
+
+  const value = await getOrCreateDefaultThread();
+  cachedInterview = { value, at: Date.now() };
+  return value;
 }
