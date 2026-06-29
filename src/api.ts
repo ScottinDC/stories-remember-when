@@ -61,6 +61,26 @@ async function pollInterview(questionId: string, attempts = 60): Promise<Intervi
   throw new Error("Saving is taking longer than expected. Please refresh and try again.");
 }
 
+export async function verifySession() {
+  const response = await apiFetch("/api/session");
+  if (!response.ok) {
+    const body = await response.text();
+    if (/Internal Error/i.test(body)) {
+      throw new Error("The server could not verify your sign-in. Please try again.");
+    }
+    let message: string | undefined;
+    try {
+      const error = JSON.parse(body) as { error?: string };
+      message = error.error;
+    } catch {
+      message = body.trim() || undefined;
+    }
+    throw new ApiAuthError(message ?? "Sign in required.", response.status);
+  }
+
+  return (await response.json()) as { ok: boolean; email: string };
+}
+
 export async function fetchInterview() {
   const attempts = 3;
   let lastError: Error | null = null;

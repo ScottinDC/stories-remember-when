@@ -1,6 +1,6 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
-import { ApiAuthError, fetchInterview } from "./api";
+import { ApiAuthError, fetchInterview, verifySession } from "./api";
 import { useAuth } from "./auth/AuthProvider";
 import { AuthStatus } from "./auth/LoginScreen";
 import { AppHeader } from "./components/AppHeader";
@@ -16,7 +16,8 @@ export function App() {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    fetchInterview()
+    verifySession()
+      .then(() => fetchInterview())
       .then(setState)
       .catch(async (err: unknown) => {
         if (err instanceof ApiAuthError) {
@@ -50,7 +51,8 @@ export function App() {
               onClick={() => {
                 setLoading(true);
                 setError(null);
-                fetchInterview()
+                verifySession()
+                  .then(() => fetchInterview())
                   .then(setState)
                   .catch(async (err: unknown) => {
                     if (err instanceof ApiAuthError) {

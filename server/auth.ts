@@ -1,4 +1,3 @@
-import { getContext } from "@netlify/functions";
 import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
 
 type NetlifyIdentityContext = {
@@ -6,6 +5,13 @@ type NetlifyIdentityContext = {
   user?: {
     email?: string;
     exp?: number;
+    sub?: string;
+    user_metadata?: {
+      email?: string;
+    };
+    app_metadata?: {
+      email?: string;
+    };
   };
 };
 
@@ -37,14 +43,19 @@ type AccessTokenClaims = {
   };
 };
 
+function decodeBase64Url(segment: string) {
+  const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Buffer.from(padded, "base64").toString("utf8");
+}
+
 function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) {
       return null;
     }
-    const payload = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
-    return JSON.parse(payload) as AccessTokenClaims;
+    return JSON.parse(decodeBase64Url(parts[1])) as AccessTokenClaims;
   } catch {
     return null;
   }
@@ -59,6 +70,10 @@ function emailFromClaims(claims: AccessTokenClaims | null) {
     (typeof claims.user_metadata?.email === "string" ? claims.user_metadata.email : undefined) ??
     (typeof claims.app_metadata?.email === "string" ? claims.app_metadata.email : undefined)
   );
+}
+
+function getNetlifyIdentityContext(): NetlifyIdentityContext | null {
+  return (globalThis as NetlifyGlobals).netlifyIdentityContext ?? null;
 }
 
 export function isAuthDisabled() {
@@ -119,15 +134,6 @@ function readRuntimeCookie(name: string, requestContext?: AuthRequestContext) {
     // Ignore cookie API failures and fall back to request parsing.
   }
 
-  try {
-    const fromGetContext = getContext().cookies?.get?.(name);
-    if (fromGetContext) {
-      return fromGetContext;
-    }
-  } catch {
-    // getContext is only valid during an active request.
-  }
-
   return (globalThis as NetlifyGlobals).Netlify?.context?.cookies?.get?.(name) ?? null;
 }
 
@@ -143,6 +149,23 @@ function readServerJwt(req?: Request, requestContext?: AuthRequestContext) {
   }
 
   return readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
+}
+
+function emailFromIdentityContext(context: NetlifyIdentityContext) {
+  const email =
+    context.user?.email ??
+    (typeof context.user?.user_metadata?.email === "string" ? context.user.user_metadata.email : undefined) ??
+    (typeof context.user?.app_metadata?.email === "string" ? context.user.app_metadata.email : undefined);
+  if (!email) {
+    return null;
+  }
+
+  const exp = context.user?.exp;
+  if (exp && exp < Math.floor(Date.now() / 1000)) {
+    throw new Error("Invalid or expired sign-in.");
+  }
+
+  return email;
 }
 
 function emailFromJwt(token: string) {
@@ -161,11 +184,26 @@ function emailFromJwt(token: string) {
 
 function resolveAuthenticatedEmail(req?: Request, requestContext?: AuthRequestContext): string {
   const token = readServerJwt(req, requestContext);
-  if (!token) {
-    throw new Error("Sign in required.");
+  if (token) {
+    try {
+      return emailFromJwt(token);
+    } catch (error) {
+      const identityContext = getNetlifyIdentityContext();
+      const email = identityContext ? emailFromIdentityContext(identityContext) : null;
+      if (email) {
+        return email;
+      }
+      throw error;
+    }
   }
 
-  return emailFromJwt(token);
+  const identityContext = getNetlifyIdentityContext();
+  const email = identityContext ? emailFromIdentityContext(identityContext) : null;
+  if (email) {
+    return email;
+  }
+
+  throw new Error("Sign in required.");
 }
 
 export type AuthResult =

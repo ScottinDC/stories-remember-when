@@ -1,3 +1,10 @@
+import {
+  handleAuthCallback,
+  hydrateSession,
+  logout as identityLogout,
+  oauthLogin
+} from "@netlify/identity";
+
 const TOKEN_STORAGE_KEY = "remember-when.auth-token";
 
 export type AuthUser = {
@@ -23,6 +30,12 @@ type AccessTokenClaims = {
     email?: string;
   };
 };
+
+function decodeBase64Url(segment: string) {
+  const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return atob(padded);
+}
 
 function readCookieToken(name: string) {
   const match = new RegExp(`(?:^|;\\s*)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=([^;]*)`).exec(document.cookie);
@@ -54,11 +67,18 @@ function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
     if (parts.length !== 3) {
       return null;
     }
-    const payload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(payload) as AccessTokenClaims;
+    return JSON.parse(decodeBase64Url(parts[1])) as AccessTokenClaims;
   } catch {
     return null;
   }
+}
+
+function syncStoredAccessToken(token: string | null | undefined) {
+  if (!token) {
+    return null;
+  }
+  sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  return token;
 }
 
 export function userFromAccessToken(token: string): AuthUser | null {
@@ -73,16 +93,7 @@ export function userFromAccessToken(token: string): AuthUser | null {
   return { email };
 }
 
-function storeAccessToken(token: string, refreshToken?: string | null) {
-  sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `nf_jwt=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
-  if (refreshToken) {
-    document.cookie = `nf_refresh=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax${secure}`;
-  }
-}
-
-function readHashToken() {
+function readLegacyHashToken() {
   const hash = window.location.hash.replace(/^#/, "");
   if (!hash) {
     return null;
@@ -95,23 +106,28 @@ function readHashToken() {
   }
 
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  storeAccessToken(token, params.get("refresh_token"));
+  syncStoredAccessToken(token);
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `nf_jwt=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
+  const refreshToken = params.get("refresh_token");
+  if (refreshToken) {
+    document.cookie = `nf_refresh=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax${secure}`;
+  }
   return token;
 }
 
 export function getStoredAccessToken() {
-  const fromHash = readHashToken();
-  if (fromHash) {
-    return fromHash;
+  const fromCookie = readCookieToken("nf_jwt");
+  if (fromCookie) {
+    return syncStoredAccessToken(fromCookie);
   }
 
   const stored = sessionStorage.getItem(TOKEN_STORAGE_KEY);
   if (stored) {
-    storeAccessToken(stored);
     return stored;
   }
 
-  return readCookieToken("nf_jwt");
+  return readLegacyHashToken();
 }
 
 export function hasStoredSession() {
@@ -124,13 +140,48 @@ export function clearStoredAccessToken() {
   document.cookie = "nf_refresh=; Path=/; Max-Age=0; SameSite=Lax";
 }
 
+export async function resolveAuthUser(): Promise<AuthUser | null> {
+  if (import.meta.env.DEV) {
+    const token = getStoredAccessToken();
+    return token ? userFromAccessToken(token) : null;
+  }
+
+  try {
+    const callback = await handleAuthCallback();
+    if (callback?.user?.email) {
+      syncStoredAccessToken(getStoredAccessToken());
+      return { email: callback.user.email };
+    }
+  } catch {
+    // Not an OAuth callback URL.
+  }
+
+  try {
+    const hydrated = await hydrateSession();
+    if (hydrated?.email) {
+      syncStoredAccessToken(getStoredAccessToken());
+      return { email: hydrated.email };
+    }
+  } catch {
+    // Fall back to locally stored token.
+  }
+
+  const token = getStoredAccessToken();
+  return token ? userFromAccessToken(token) : null;
+}
+
 export function loginWithGoogle() {
-  const redirectUri = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-  const params = new URLSearchParams({
-    provider: "google",
-    redirect_uri: redirectUri
-  });
-  window.location.assign(`/.netlify/identity/authorize?${params.toString()}`);
+  if (import.meta.env.DEV) {
+    const redirectUri = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    const params = new URLSearchParams({
+      provider: "google",
+      redirect_uri: redirectUri
+    });
+    window.location.assign(`/.netlify/identity/authorize?${params.toString()}`);
+    return;
+  }
+
+  oauthLogin("google");
 }
 
 export async function fetchAuthConfig() {
@@ -175,8 +226,12 @@ export async function fetchAuthConfig() {
 export async function logoutIdentity() {
   clearStoredAccessToken();
   try {
-    await fetch("/.netlify/identity/logout", { method: "POST" });
+    await identityLogout();
   } catch {
-    // Local dev has no Identity endpoint; clearing the token is enough.
+    try {
+      await fetch("/.netlify/identity/logout", { method: "POST" });
+    } catch {
+      // Local dev has no Identity endpoint; clearing the token is enough.
+    }
   }
 }

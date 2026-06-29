@@ -37,6 +37,10 @@ export default async (req: Request, context: Context) => {
       return json({ error: auth.error }, auth.status);
     }
 
+    if (req.method === "GET" && path === "/api/session") {
+      return json({ ok: true, email: auth.email });
+    }
+
     if (req.method === "GET" && path === "/api/interview") {
       const { handleGetInterview } = await import("../../server/handlers-read");
       return json(await handleGetInterview());

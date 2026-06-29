@@ -5,7 +5,7 @@ import {
   getStoredAccessToken,
   loginWithGoogle,
   logoutIdentity,
-  userFromAccessToken,
+  resolveAuthUser,
   type AuthConfig,
   type AuthConfigStatus,
   type AuthUser
@@ -58,17 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const token = getStoredAccessToken();
-      if (!token) {
-        setUser(null);
-        return;
-      }
-
-      const currentUser = userFromAccessToken(token);
+      const currentUser = await resolveAuthUser();
       if (!currentUser) {
         clearStoredAccessToken();
         setUser(null);
-        setError("Your sign-in expired. Please sign in again.");
         return;
       }
 
