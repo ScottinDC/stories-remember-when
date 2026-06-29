@@ -12,7 +12,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["better-sqlite3"]
+  external_node_modules = ["better-sqlite3", "@google-cloud/storage"]
   included_files = ["server/**"]
 
 [functions."api"]

@@ -74,9 +74,9 @@ function readCookieHeader(cookieHeader: string | null | undefined, name: string)
 }
 
 function readServerJwt(req?: Request) {
-  const identityContext = getNetlifyIdentityContext();
-  if (identityContext?.token) {
-    return identityContext.token;
+  const bearer = extractBearerToken(req?.headers.get("authorization"));
+  if (bearer) {
+    return bearer;
   }
 
   const netlifyCookies = (globalThis as NetlifyGlobals).Netlify?.context?.cookies;
@@ -85,12 +85,17 @@ function readServerJwt(req?: Request) {
     return fromRuntime;
   }
 
-  const bearer = extractBearerToken(req?.headers.get("authorization"));
-  if (bearer) {
-    return bearer;
+  const fromCookieHeader = readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
+  if (fromCookieHeader) {
+    return fromCookieHeader;
   }
 
-  return readCookieHeader(req?.headers.get("cookie"), "nf_jwt");
+  const identityContext = getNetlifyIdentityContext();
+  if (identityContext?.user?.email && identityContext.token) {
+    return identityContext.token;
+  }
+
+  return null;
 }
 
 function emailFromJwt(token: string) {
@@ -163,7 +168,7 @@ export async function requireAuth(
     return { email };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid or expired sign-in.";
-    const status = message.includes("not authorized") ? 403 : 401;
+    const status = message.includes("approved family list") ? 403 : 401;
     return { status, error: message };
   }
 }

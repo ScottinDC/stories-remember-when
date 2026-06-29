@@ -60,19 +60,27 @@ export async function appendLineToGcs(objectName: string, line: string) {
   const file = storage.bucket(getBucketName()).file(objectName);
   const next = existing.length > 0 && !existing.endsWith("\n") ? `${existing}\n${line}\n` : `${existing}${line}\n`;
 
-  await file.save(next, {
-    resumable: false,
-    contentType: "application/x-ndjson"
-  });
+  await withTimeout(
+    file.save(next, {
+      resumable: false,
+      contentType: "application/x-ndjson"
+    }),
+    GCS_OPERATION_TIMEOUT_MS,
+    "Cloud storage append"
+  );
 }
 
 export async function writeJsonToGcs(objectName: string, value: unknown) {
   const storage = getStorageClient();
   const file = storage.bucket(getBucketName()).file(objectName);
-  await file.save(JSON.stringify(value, null, 2), {
-    resumable: false,
-    contentType: "application/json"
-  });
+  await withTimeout(
+    file.save(JSON.stringify(value, null, 2), {
+      resumable: false,
+      contentType: "application/json"
+    }),
+    GCS_OPERATION_TIMEOUT_MS,
+    "Cloud storage write"
+  );
 }
 
 export async function deleteGcsObject(objectName: string) {
