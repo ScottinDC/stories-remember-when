@@ -4,17 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        dusty: "#81A6C6",
-        pale: "#AACDDC",
-        cream: "#F3E3D0",
-        sand: "#D2C4B4",
+        linen: {
+          50: "#FFFCF7",
+          100: "#F4EFE4",
+          200: "#E8DFD0",
+          300: "#D8CBB8"
+        },
         ink: {
-          DEFAULT: "#2a3338",
-          muted: "#5a6570"
+          DEFAULT: "#2A2118",
+          muted: "#6B5E4F",
+          faint: "#958879"
+        },
+        umber: {
+          DEFAULT: "#9C6644",
+          dark: "#7A4F33",
+          soft: "#EEE4D7"
         }
       },
       fontFamily: {
-        serif: ["Libre Baskerville", "Georgia", "serif"]
+        sans: ["Source Sans 3", "ui-sans-serif", "system-ui", "sans-serif"]
+      },
+      boxShadow: {
+        panel: "0 1px 2px rgba(42, 33, 24, 0.05), 0 8px 24px rgba(42, 33, 24, 0.06)"
       }
     }
   },

@@ -1,8 +1,9 @@
 export const palette = {
-  dustyBlue: "#81A6C6",
-  paleBlue: "#AACDDC",
-  cream: "#F3E3D0",
-  sand: "#D2C4B4",
-  ink: "#2a3338",
-  inkMuted: "#5a6570"
+  primary: "#9C6644",
+  primaryLight: "#EEE4D7",
+  link: "#9C6644",
+  pending: "#D8CBB8",
+  processing: "#C4A574",
+  ink: "#2A2118",
+  inkMuted: "#6B5E4F"
 } as const;

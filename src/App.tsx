@@ -1,7 +1,10 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
 import { fetchInterview } from "./api";
+import { AppHeader } from "./components/AppHeader";
 import { InterviewForm } from "./components/InterviewForm";
+import { toTitleCase } from "./lib/titleCase";
+import { countByStatus } from "./lib/interview";
 import type { InterviewState } from "./types";
 
 export function App() {
@@ -18,9 +21,9 @@ export function App() {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-cream">
+      <main className="grid min-h-screen place-items-center bg-linen-100">
         <div className="flex items-center gap-3 text-base text-ink-muted">
-          <Loader2 className="h-5 w-5 animate-spin text-dusty" />
+          <Loader2 className="h-5 w-5 animate-spin text-umber" />
           Opening the interview
         </div>
       </main>
@@ -29,21 +32,30 @@ export function App() {
 
   if (!state) {
     return (
-      <main className="grid min-h-screen place-items-center bg-cream px-4">
+      <main className="grid min-h-screen place-items-center bg-linen-100 px-4">
         <p className="text-base text-[#8b3a3a]">{error ?? "Could not load the interview."}</p>
       </main>
     );
   }
 
-  return (
-    <main className="min-h-screen bg-cream px-4 py-6 md:px-6 md:py-8">
-      {error ? (
-        <div className="mx-auto mb-5 max-w-6xl rounded-lg border border-[#d4b8b8] bg-[#fdf8f8] px-4 py-3 text-base text-[#8b3a3a]">
-          {error}
-        </div>
-      ) : null}
+  const nodes = state.nodes;
 
-      <InterviewForm onStateChange={setState} setError={setError} state={state} />
+  return (
+    <main className="min-h-screen bg-linen-100 px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+        <AppHeader
+          answeredCount={countByStatus(nodes, "answered")}
+          pendingCount={countByStatus(nodes, "pending")}
+          processingCount={countByStatus(nodes, "processing")}
+          title={toTitleCase(state.thread.title)}
+        />
+
+        {error ? (
+          <div className="rounded-lg border border-[#e8c4c4] bg-[#fff5f5] px-4 py-3 text-base text-[#8b3a3a]">{error}</div>
+        ) : null}
+
+        <InterviewForm onStateChange={setState} setError={setError} state={state} />
+      </div>
     </main>
   );
 }

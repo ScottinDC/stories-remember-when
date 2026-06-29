@@ -10,18 +10,18 @@ type QuestionSeriesProps = {
 
 function StatusIcon({ status }: { status: MemoryNode["status"] }) {
   if (status === "answered") {
-    return <CheckCircle2 className="h-4 w-4 text-dusty" aria-hidden="true" />;
+    return <CheckCircle2 className="h-4 w-4 text-umber" aria-hidden="true" />;
   }
   if (status === "processing") {
-    return <Loader2 className="h-4 w-4 animate-spin text-dusty" aria-hidden="true" />;
+    return <Loader2 className="h-4 w-4 animate-spin text-umber" aria-hidden="true" />;
   }
-  return <Circle className="h-4 w-4 text-sand" aria-hidden="true" />;
+  return <Circle className="h-4 w-4 text-linen-300" aria-hidden="true" />;
 }
 
 export function QuestionSeries({ nodes, activeQuestionId, onSelect }: QuestionSeriesProps) {
   return (
     <div className="form-card p-4 md:p-5">
-      <h2 className="mb-3 text-base font-normal text-ink">Question series</h2>
+      <h2 className="mb-3 text-base font-normal text-ink">Question Series</h2>
       <div className="space-y-2">
         {nodes.map((node) => {
           const isActive = node.id === activeQuestionId;
@@ -29,8 +29,8 @@ export function QuestionSeries({ nodes, activeQuestionId, onSelect }: QuestionSe
             <button
               className={`w-full rounded-lg border px-3 py-3 text-left transition ${
                 isActive
-                  ? "border-dusty bg-pale/30"
-                  : "border-sand bg-white hover:bg-cream/60"
+                  ? "border-umber bg-umber-soft"
+                  : "border-linen-200 bg-white hover:bg-linen-50"
               }`}
               key={node.id}
               onClick={() => onSelect(node.id)}
