@@ -81,12 +81,14 @@ async function seedLedger(state: InterviewState) {
 }
 
 export async function getOrCreateDefaultThread(): Promise<InterviewState> {
-  const existing = await loadState();
-  if (existing) {
-    const normalized = normalizeState(existing);
-    const needsBranchFields = existing.nodes.some((node) => node.generation === undefined || !node.branchRootId);
+  const raw = await readJsonFromGcs<InterviewState>(STATE_OBJECT);
+  if (raw) {
+    const normalized = normalizeState(raw);
+    const needsBranchFields = raw.nodes.some((node) => node.generation === undefined || !node.branchRootId);
     if (needsBranchFields) {
-      await persistState(normalized);
+      void persistState(normalized).catch((error) => {
+        console.error("Failed to migrate interview branch fields:", error);
+      });
     }
     return normalized;
   }

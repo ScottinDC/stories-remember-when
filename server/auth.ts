@@ -1,4 +1,3 @@
-import { decodeJwt } from "jose";
 import { isNetlifyRuntime, readRuntimeEnv } from "./runtime-env";
 
 type NetlifyIdentityContext = {
@@ -19,6 +18,27 @@ type NetlifyGlobals = {
     };
   };
 };
+
+type AccessTokenClaims = {
+  email?: string;
+  exp?: number;
+  user_metadata?: {
+    email?: string;
+  };
+};
+
+function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return null;
+    }
+    const payload = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    return JSON.parse(payload) as AccessTokenClaims;
+  } catch {
+    return null;
+  }
+}
 
 export function isAuthDisabled() {
   if (isNetlifyRuntime()) {
@@ -99,25 +119,15 @@ function readServerJwt(req?: Request) {
 }
 
 function emailFromJwt(token: string) {
-  let payload: ReturnType<typeof decodeJwt>;
-  try {
-    payload = decodeJwt(token);
-  } catch {
-    throw new Error("Invalid or expired sign-in.");
-  }
-
+  const claims = decodeAccessTokenClaims(token);
   const email =
-    typeof payload.email === "string"
-      ? payload.email
-      : typeof (payload as { user_metadata?: { email?: string } }).user_metadata?.email === "string"
-        ? (payload as { user_metadata: { email: string } }).user_metadata.email
-        : null;
+    claims?.email ??
+    (typeof claims?.user_metadata?.email === "string" ? claims.user_metadata.email : undefined);
   if (!email) {
     throw new Error("Token is missing an email claim.");
   }
 
-  const exp = typeof payload.exp === "number" ? payload.exp : null;
-  if (exp && exp < Math.floor(Date.now() / 1000)) {
+  if (claims?.exp && claims.exp < Math.floor(Date.now() / 1000)) {
     throw new Error("Invalid or expired sign-in.");
   }
 

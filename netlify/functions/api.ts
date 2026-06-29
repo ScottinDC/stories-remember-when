@@ -1,13 +1,12 @@
 import type { Context } from "@netlify/functions";
 import { requireAuth } from "../../server/auth";
-import { markNodeFailed } from "../../server/db";
-import { handleDeleteAnswer, finishBackgroundAnswer, handleGetInterview, handleHealth, handlePostAnswerBackground } from "../../server/handlers";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "Cache-Control": "private, no-store"
     }
   });
 }
@@ -23,6 +22,7 @@ export default async (req: Request, context: Context) => {
     const path = routePath(url);
 
     if (req.method === "GET" && path === "/api/health") {
+      const { handleHealth } = await import("../../server/handlers-read");
       return json(await handleHealth());
     }
 
@@ -32,8 +32,16 @@ export default async (req: Request, context: Context) => {
     }
 
     if (req.method === "GET" && path === "/api/interview") {
+      const { handleGetInterview } = await import("../../server/handlers-read");
       return json(await handleGetInterview());
     }
+
+    const {
+      handleDeleteAnswer,
+      finishBackgroundAnswer,
+      handlePostAnswerBackground
+    } = await import("../../server/handlers");
+    const { markNodeFailed } = await import("../../server/db");
 
     const answerMatch = path.match(/^\/api\/responses\/([^/]+)\/answer$/);
 

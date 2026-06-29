@@ -3,7 +3,12 @@ import type { MemoryNode } from "./types";
 export function nodeDepth(nodes: MemoryNode[], node: MemoryNode) {
   let depth = 0;
   let parentId = node.parentQuestionId;
+  const visited = new Set<string>();
   while (parentId) {
+    if (visited.has(parentId)) {
+      break;
+    }
+    visited.add(parentId);
     const parent = nodes.find((candidate) => candidate.id === parentId);
     if (!parent) {
       break;
@@ -16,8 +21,13 @@ export function nodeDepth(nodes: MemoryNode[], node: MemoryNode) {
 
 export function buildTreePath(nodes: MemoryNode[], node: MemoryNode) {
   const path: string[] = [];
+  const visited = new Set<string>();
   let current: MemoryNode | undefined = node;
   while (current) {
+    if (visited.has(current.id)) {
+      break;
+    }
+    visited.add(current.id);
     path.unshift(current.id);
     current = current.parentQuestionId
       ? nodes.find((candidate) => candidate.id === current!.parentQuestionId)

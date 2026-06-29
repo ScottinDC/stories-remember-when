@@ -1,6 +1,5 @@
 import { authConfig } from "./auth";
 import { storageConfig } from "./runtime-env";
-import { readJsonFromGcs } from "./storage";
 import {
   addFollowUpQuestion,
   clearNodeAnswer,
@@ -16,26 +15,7 @@ import { prepareAudioForUpload } from "./audio";
 import { deleteAnswerArtifacts, uploadAudioToGcs, writeAnswerManifest } from "./storage";
 
 export async function handleHealth() {
-  const storage = storageConfig();
-  let storageReachable = false;
-  let storageError: string | undefined;
-
-  if (storage.storageConfigured) {
-    try {
-      await readJsonFromGcs("app/interview-state.json");
-      storageReachable = true;
-    } catch (error) {
-      storageError = error instanceof Error ? error.message : "Could not reach cloud storage.";
-    }
-  }
-
-  return {
-    ok: true,
-    ...authConfig(),
-    ...storage,
-    storageReachable,
-    storageError
-  };
+  return { ok: true, ...authConfig(), ...storageConfig() };
 }
 
 export async function handleGetInterview() {
