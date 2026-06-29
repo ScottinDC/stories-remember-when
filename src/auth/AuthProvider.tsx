@@ -71,27 +71,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const accessCheck = await fetch("/api/interview", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (accessCheck.status === 401 || accessCheck.status === 403) {
-        clearStoredAccessToken();
-        setUser(null);
-        const payload = (await accessCheck.json().catch(() => null)) as { error?: string } | null;
-        setError(payload?.error ?? "This account is not authorized to access Remember When.");
-        return;
-      }
-
-      if (!accessCheck.ok) {
-        const payload = (await accessCheck.json().catch(() => null)) as { error?: string } | null;
-        setUser(null);
-        setError(payload?.error ?? "Could not load the interview. Try again in a moment.");
-        return;
-      }
-
       setUser(currentUser);
     } catch (bootstrapError) {
       if (import.meta.env.DEV) {

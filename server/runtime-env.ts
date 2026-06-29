@@ -49,3 +49,16 @@ export function useGcsBackend() {
       readRuntimeEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON")
   );
 }
+
+export function storageConfig() {
+  const hasServiceAccount = Boolean(readRuntimeEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON"));
+  const hasBucket = Boolean(readRuntimeEnv("GOOGLE_CLOUD_STORAGE_BUCKET"));
+  const hasProject = Boolean(readRuntimeEnv("GOOGLE_CLOUD_PROJECT"));
+  return {
+    storageBackend: useGcsBackend() ? "gcs" : "sqlite",
+    hasServiceAccount,
+    hasBucket,
+    hasProject,
+    storageConfigured: hasServiceAccount && hasBucket && hasProject
+  };
+}

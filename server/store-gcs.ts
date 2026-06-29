@@ -93,7 +93,9 @@ export async function getOrCreateDefaultThread(): Promise<InterviewState> {
 
   const initial = createInitialState();
   await persistState(initial);
-  await seedLedger(initial);
+  void seedLedger(initial).catch((error) => {
+    console.error("Failed to seed interview ledger:", error);
+  });
   return initial;
 }
 

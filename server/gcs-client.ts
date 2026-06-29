@@ -4,6 +4,14 @@ import { readRuntimeEnv } from "./runtime-env";
 
 let cachedClient: Storage | null = null;
 
+function parseServiceAccountJson(raw: string) {
+  try {
+    return JSON.parse(raw) as { project_id?: string };
+  } catch {
+    return JSON.parse(raw.replace(/\\n/g, "\n")) as { project_id?: string };
+  }
+}
+
 export function getStorageClient() {
   if (cachedClient) {
     return cachedClient;
@@ -13,7 +21,7 @@ export function getStorageClient() {
   const credentialsPath = readRuntimeEnv("GOOGLE_APPLICATION_CREDENTIALS");
 
   if (serviceAccountJson) {
-    const credentials = JSON.parse(serviceAccountJson);
+    const credentials = parseServiceAccountJson(serviceAccountJson);
     cachedClient = new Storage({
       projectId: readRuntimeEnv("GOOGLE_CLOUD_PROJECT") ?? credentials.project_id,
       credentials

@@ -62,7 +62,8 @@ async function pollInterview(questionId: string, attempts = 60): Promise<Intervi
 export async function fetchInterview() {
   const response = await apiFetch("/api/interview");
   if (!response.ok) {
-    throw new Error("Could not load the interview.");
+    const error = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(error?.error ?? `Could not load the interview (${response.status}).`);
   }
   return (await response.json()) as InterviewState;
 }
