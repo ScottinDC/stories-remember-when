@@ -94,7 +94,7 @@ export function QuestionSeries({ nodes, activeQuestionId, onSelect }: QuestionSe
                 </span>
                 <span>
                   <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                    {seriesLabel(node)} · follow-up
+                    {seriesLabel(node)} · {node.branchLabel} · gen {node.generation}
                   </span>
                   <span className={`text-base leading-snug ${isActive ? "text-[#f4f7fa]" : "text-ink-secondary"}`}>
                     {node.question}

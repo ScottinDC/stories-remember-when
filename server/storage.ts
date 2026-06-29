@@ -14,6 +14,30 @@ export async function readJsonFromGcs<T>(objectName: string): Promise<T | null> 
   }
 }
 
+export async function readTextFromGcs(objectName: string): Promise<string | null> {
+  const storage = getStorageClient();
+  const file = storage.bucket(getBucketName()).file(objectName);
+
+  try {
+    const [contents] = await file.download();
+    return contents.toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+export async function appendLineToGcs(objectName: string, line: string) {
+  const existing = (await readTextFromGcs(objectName)) ?? "";
+  const storage = getStorageClient();
+  const file = storage.bucket(getBucketName()).file(objectName);
+  const next = existing.length > 0 && !existing.endsWith("\n") ? `${existing}\n${line}\n` : `${existing}${line}\n`;
+
+  await file.save(next, {
+    resumable: false,
+    contentType: "application/x-ndjson"
+  });
+}
+
 export async function writeJsonToGcs(objectName: string, value: unknown) {
   const storage = getStorageClient();
   const file = storage.bucket(getBucketName()).file(objectName);
@@ -60,6 +84,9 @@ export async function uploadAudioToGcs(input: {
         questionId: input.node.id,
         parentQuestionId: input.node.parentQuestionId ?? "",
         sequenceOrder: String(input.node.sequenceOrder),
+        generation: String(input.node.generation),
+        branchRootId: input.node.branchRootId,
+        branchLabel: input.node.branchLabel,
         depth: String(input.node.depth),
         treePath: input.node.treePath.join("/")
       }
@@ -87,7 +114,10 @@ export async function writeAnswerManifest(input: {
     questionId: input.node.id,
     parentQuestionId: input.node.parentQuestionId,
     sequenceOrder: input.node.sequenceOrder,
+    generation: input.node.generation,
     depth: input.node.depth,
+    branchRootId: input.node.branchRootId,
+    branchLabel: input.node.branchLabel,
     treePath: input.node.treePath,
     question: input.node.question,
     status: input.node.status,

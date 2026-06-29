@@ -41,6 +41,13 @@ export function promptLabel(node: MemoryNode) {
   return `Prompt ${questionNumber(node)}`;
 }
 
+export function branchCaption(node: MemoryNode) {
+  if (node.depth === 0) {
+    return questionCode(node);
+  }
+  return `${questionCode(node)} · ${node.branchLabel} branch · gen ${node.generation}`;
+}
+
 export function questionCode(node: MemoryNode) {
   return `Q${node.sequenceOrder}`;
 }

@@ -1,6 +1,6 @@
 import React from "react";
-import { Download, Loader2, Pause, Play, Trash2, Volume2 } from "lucide-react";
-import { answeredNodes, promptLabel, questionNumber } from "../lib/interview";
+import { Download, Loader2, Pause, Play, RotateCcw, Volume2 } from "lucide-react";
+import { answeredNodes, branchCaption, questionNumber } from "../lib/interview";
 import type { MemoryNode } from "../types";
 
 type RecordingLibraryProps = {
@@ -59,7 +59,7 @@ function RecordingRow({
     <article className="border-t border-line-soft py-4 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">{promptLabel(node)}</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">{branchCaption(node)}</p>
           <h3 className="mt-1 text-sm font-medium leading-snug text-ink">{node.question}</h3>
         </div>
         {node.status === "processing" ? (
@@ -91,13 +91,14 @@ function RecordingRow({
           <Pause className="h-3.5 w-3.5" />
         </button>
         <button
-          aria-label="Delete recording"
-          className="btn-icon text-[#9b2c2c] hover:border-[#f0caca] hover:bg-[#fff8f8]"
+          aria-label="Re-record response"
+          className="btn-icon text-navy-light hover:border-navy-light/40 hover:bg-page"
           disabled={deleting || node.status === "processing"}
           onClick={() => onDelete(node.id)}
+          title="Re-record"
           type="button"
         >
-          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
         </button>
         <button
           aria-label="Download recording"

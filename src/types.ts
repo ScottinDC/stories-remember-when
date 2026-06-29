@@ -11,6 +11,9 @@ export type MemoryNode = {
   status: "pending" | "processing" | "answered";
   sequenceOrder: number;
   depth: number;
+  generation: number;
+  branchRootId: string;
+  branchLabel: string;
   treePath: string[];
 };
 

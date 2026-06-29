@@ -59,6 +59,9 @@ function rowToNode(row: Record<string, string | null>, nodes: MemoryNode[], inde
     status: row.status as MemoryNode["status"],
     sequenceOrder: index + 1,
     depth: 0,
+    generation: 0,
+    branchRootId: row.id as string,
+    branchLabel: "",
     treePath: [row.id as string]
   };
   const depth = nodeDepth(nodes.length ? nodes : [base], base);
@@ -80,6 +83,9 @@ function hydrateNodes(rows: Record<string, string | null>[]) {
     status: row.status as MemoryNode["status"],
     sequenceOrder: index + 1,
     depth: 0,
+    generation: 0,
+    branchRootId: row.id as string,
+    branchLabel: "",
     treePath: [row.id as string]
   }));
   return preliminary.map((node, index) => rowToNode(rows[index], preliminary, index));

@@ -8,6 +8,7 @@ import {
   markNodeProcessing
 } from "./db";
 import { generateFollowUp, transcribeAudio } from "./ai";
+import { appendLedgerEvent, ledgerFromNode } from "./ledger";
 import { prepareAudioForUpload } from "./audio";
 import { deleteAnswerArtifacts, uploadAudioToGcs, writeAnswerManifest } from "./storage";
 
@@ -47,6 +48,9 @@ async function saveAnswerForNode(input: {
     audioByteLength: prepared.buffer.byteLength,
     audioFormat: prepared.extension,
     sequenceOrder: node.sequenceOrder,
+    generation: node.generation,
+    branchRootId: node.branchRootId,
+    branchLabel: node.branchLabel,
     depth: node.depth,
     treePath: node.treePath
   };
@@ -69,6 +73,8 @@ async function saveAnswerForNode(input: {
     audioObjectName: uploaded.objectName
   });
 
+  await appendLedgerEvent(ledgerFromNode(answeredNode, "response_saved"));
+
   const currentState = await getThreadState(answeredNode.threadId);
   const followUpQuestion = await generateFollowUp(currentState.nodes, answeredNode);
   const followUpNode = await addFollowUpQuestion({
@@ -80,6 +86,11 @@ async function saveAnswerForNode(input: {
       guidedByAnswerId: answeredNode.id
     }
   });
+
+  if (followUpNode) {
+    await appendLedgerEvent(ledgerFromNode(followUpNode, "followup_generated"));
+    await appendLedgerEvent(ledgerFromNode(followUpNode, "question_created"));
+  }
 
   return {
     status: 200 as const,
@@ -116,6 +127,8 @@ export async function handleDeleteAnswer(questionId: string) {
   if (!cleared) {
     return { status: 500 as const, body: { error: "Could not delete the answer." } };
   }
+
+  await appendLedgerEvent(ledgerFromNode(cleared, "response_deleted"));
 
   return {
     status: 200 as const,
@@ -157,6 +170,9 @@ export async function handlePostAnswerBackground(input: {
       audioByteLength: prepared.buffer.byteLength,
       audioFormat: prepared.extension,
       sequenceOrder: node.sequenceOrder,
+      generation: node.generation,
+      branchRootId: node.branchRootId,
+      branchLabel: node.branchLabel,
       depth: node.depth,
       treePath: node.treePath
     }
@@ -194,6 +210,9 @@ export async function finishBackgroundAnswer(input: {
     audioByteLength: input.prepared.buffer.byteLength,
     audioFormat: input.prepared.extension,
     sequenceOrder: node.sequenceOrder,
+    generation: node.generation,
+    branchRootId: node.branchRootId,
+    branchLabel: node.branchLabel,
     depth: node.depth,
     treePath: node.treePath
   };
@@ -220,9 +239,11 @@ export async function finishBackgroundAnswer(input: {
     audioObjectName: input.uploaded.objectName
   });
 
+  await appendLedgerEvent(ledgerFromNode(answeredNode, "response_saved"));
+
   const currentState = await getThreadState(answeredNode.threadId);
   const followUpQuestion = await generateFollowUp(currentState.nodes, answeredNode);
-  await addFollowUpQuestion({
+  const followUpNode = await addFollowUpQuestion({
     threadId: answeredNode.threadId,
     parentQuestionId: answeredNode.id,
     question: followUpQuestion,
@@ -231,4 +252,9 @@ export async function finishBackgroundAnswer(input: {
       guidedByAnswerId: answeredNode.id
     }
   });
+
+  if (followUpNode) {
+    await appendLedgerEvent(ledgerFromNode(followUpNode, "followup_generated"));
+    await appendLedgerEvent(ledgerFromNode(followUpNode, "question_created"));
+  }
 }

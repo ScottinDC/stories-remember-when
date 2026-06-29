@@ -1,0 +1,135 @@
+import { appendFile, mkdir } from "node:fs/promises";
+import path from "node:path";
+import { appendLineToGcs } from "./storage";
+import type { MemoryNode } from "./types";
+
+const GCS_LEDGER_OBJECT = "app/interview-ledger.jsonl";
+const LOCAL_LEDGER_PATH = process.env.LEDGER_PATH ?? "./data/interview-ledger.jsonl";
+
+function useGcsLedger() {
+  return Boolean(
+    process.env.NETLIFY ||
+      process.env.DATABASE_BACKEND === "gcs" ||
+      process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON
+  );
+}
+
+export type LedgerEvent =
+  | {
+      type: "thread_initialized";
+      threadId: string;
+      at: string;
+      questionCount: number;
+    }
+  | {
+      type: "question_created";
+      threadId: string;
+      at: string;
+      questionId: string;
+      parentQuestionId: string | null;
+      sequenceOrder: number;
+      generation: number;
+      branchRootId: string;
+      branchLabel: string;
+      question: string;
+    }
+  | {
+      type: "response_saved";
+      threadId: string;
+      at: string;
+      questionId: string;
+      sequenceOrder: number;
+      generation: number;
+      branchRootId: string;
+      branchLabel: string;
+      audioObjectName: string | null;
+      transcriptLength: number;
+    }
+  | {
+      type: "response_deleted";
+      threadId: string;
+      at: string;
+      questionId: string;
+      sequenceOrder: number;
+      generation: number;
+      branchRootId: string;
+      branchLabel: string;
+      reason: "redo";
+    }
+  | {
+      type: "followup_generated";
+      threadId: string;
+      at: string;
+      questionId: string;
+      parentQuestionId: string;
+      guidedByQuestionId: string;
+      sequenceOrder: number;
+      generation: number;
+      branchRootId: string;
+      branchLabel: string;
+    };
+
+export async function appendLedgerEvent(event: LedgerEvent) {
+  const line = JSON.stringify(event);
+
+  if (useGcsLedger()) {
+    await appendLineToGcs(GCS_LEDGER_OBJECT, line);
+    return;
+  }
+
+  await mkdir(path.dirname(LOCAL_LEDGER_PATH), { recursive: true });
+  await appendFile(LOCAL_LEDGER_PATH, `${line}\n`, "utf8");
+}
+
+export function ledgerFromNode(
+  node: MemoryNode,
+  type: "question_created" | "response_saved" | "response_deleted" | "followup_generated",
+  extra: Partial<LedgerEvent> = {}
+): LedgerEvent {
+  const base = {
+    threadId: node.threadId,
+    at: new Date().toISOString(),
+    questionId: node.id,
+    sequenceOrder: node.sequenceOrder,
+    generation: node.generation,
+    branchRootId: node.branchRootId,
+    branchLabel: node.branchLabel
+  };
+
+  if (type === "question_created") {
+    return {
+      type,
+      ...base,
+      parentQuestionId: node.parentQuestionId,
+      question: node.question,
+      ...extra
+    } as LedgerEvent;
+  }
+
+  if (type === "response_saved") {
+    return {
+      type,
+      ...base,
+      audioObjectName: node.gcsObjectName,
+      transcriptLength: node.transcript?.length ?? 0,
+      ...extra
+    } as LedgerEvent;
+  }
+
+  if (type === "response_deleted") {
+    return {
+      type,
+      ...base,
+      reason: "redo",
+      ...extra
+    } as LedgerEvent;
+  }
+
+  return {
+    type: "followup_generated",
+    ...base,
+    parentQuestionId: node.parentQuestionId ?? "",
+    guidedByQuestionId: String((node.metadata as { guidedByAnswerId?: string } | null)?.guidedByAnswerId ?? node.parentQuestionId ?? ""),
+    ...extra
+  } as LedgerEvent;
+}

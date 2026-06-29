@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { INITIAL_QUESTIONS } from "./interview";
+import { appendLedgerEvent, ledgerFromNode } from "./ledger";
 import { readJsonFromGcs, writeJsonToGcs } from "./storage";
 import { buildTreePath, enrichNode, nextSequenceOrder, nodeDepth } from "./tree";
 import type { InterviewState, InterviewThread, MemoryNode } from "./types";
@@ -11,7 +12,7 @@ function normalizeNode(nodes: MemoryNode[], node: MemoryNode, index: number): Me
   const withOrder = { ...node, sequenceOrder };
   const depth = node.depth ?? nodeDepth(nodes, withOrder);
   const treePath = node.treePath ?? buildTreePath(nodes, withOrder);
-  return { ...withOrder, depth, treePath };
+  return enrichNode(nodes, { ...withOrder, depth, treePath });
 }
 
 function normalizeState(state: InterviewState): InterviewState {
@@ -43,7 +44,7 @@ function createInitialState(): InterviewState {
 
   const nodes: MemoryNode[] = INITIAL_QUESTIONS.map((question, index) => {
     const id = randomUUID();
-    return {
+    return enrichNode([], {
       id,
       threadId,
       parentQuestionId: null,
@@ -56,21 +57,43 @@ function createInitialState(): InterviewState {
       status: "pending",
       sequenceOrder: index + 1,
       depth: 0,
+      generation: 0,
+      branchRootId: id,
+      branchLabel: `Q${index + 1}`,
       treePath: [id]
-    };
+    });
   });
 
   return { thread, nodes };
 }
 
+async function seedLedger(state: InterviewState) {
+  await appendLedgerEvent({
+    type: "thread_initialized",
+    threadId: state.thread.id,
+    at: state.thread.createdAt,
+    questionCount: state.nodes.length
+  });
+
+  for (const node of state.nodes) {
+    await appendLedgerEvent(ledgerFromNode(node, "question_created"));
+  }
+}
+
 export async function getOrCreateDefaultThread(): Promise<InterviewState> {
   const existing = await loadState();
   if (existing) {
-    return existing;
+    const normalized = normalizeState(existing);
+    const needsBranchFields = existing.nodes.some((node) => node.generation === undefined || !node.branchRootId);
+    if (needsBranchFields) {
+      await persistState(normalized);
+    }
+    return normalized;
   }
 
   const initial = createInitialState();
   await persistState(initial);
+  await seedLedger(initial);
   return initial;
 }
 
@@ -223,7 +246,7 @@ export async function addFollowUpQuestion(input: {
   const depth = parent.depth + 1;
   const treePath = [...parent.treePath, id];
 
-  const node: MemoryNode = {
+  const node: MemoryNode = enrichNode(state.nodes, {
     id,
     threadId: input.threadId,
     parentQuestionId: input.parentQuestionId,
@@ -236,8 +259,9 @@ export async function addFollowUpQuestion(input: {
     status: "pending",
     sequenceOrder,
     depth,
+    generation: depth,
     treePath
-  };
+  });
 
   state.nodes.push(node);
   state.thread.updatedAt = now;
