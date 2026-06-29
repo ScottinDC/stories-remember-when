@@ -6,7 +6,24 @@ const configPath = join(homedir(), "Library/Preferences/netlify/config.json");
 const netlifyConfig = JSON.parse(readFileSync(configPath, "utf8"));
 const token = Object.values(netlifyConfig.users)[0].auth.token;
 
-const serviceAccountPath = join(process.cwd(), ".secrets/remember-when-uploader.json");
+const rememberWhenDir = join(homedir(), ".remember-when");
+const serviceAccountCandidates = [
+  join(rememberWhenDir, "service-account.json"),
+  join(process.cwd(), ".secrets/remember-when-uploader.json")
+];
+const serviceAccountPath = serviceAccountCandidates.find((path) => {
+  try {
+    readFileSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+});
+if (!serviceAccountPath) {
+  throw new Error(
+    `Could not read service account from ${serviceAccountCandidates.join(" or ")}`
+  );
+}
 const serviceAccountJson = readFileSync(serviceAccountPath, "utf8");
 
 function parseEnvFile(path) {
@@ -25,7 +42,17 @@ function parseEnvFile(path) {
   return values;
 }
 
-const localEnv = parseEnvFile(join(process.cwd(), ".env"));
+const envCandidates = [join(rememberWhenDir, ".env"), join(process.cwd(), ".env")];
+const localEnv = (() => {
+  for (const path of envCandidates) {
+    try {
+      return parseEnvFile(path);
+    } catch {
+      continue;
+    }
+  }
+  return {};
+})();
 
 const envVars = {
   OPENAI_MODEL: localEnv.OPENAI_MODEL || "gpt-4.1-mini",

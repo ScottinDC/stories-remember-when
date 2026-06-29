@@ -1,4 +1,14 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const localEnv = join(homedir(), ".remember-when", ".env");
+if (existsSync(localEnv)) {
+  dotenv.config({ path: localEnv });
+} else {
+  dotenv.config();
+}
 import cors from "cors";
 import express from "express";
 import multer from "multer";

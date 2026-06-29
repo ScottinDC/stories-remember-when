@@ -1,6 +1,6 @@
 import type { Context } from "@netlify/functions";
-import { markNodeFailed } from "../server/db";
-import { finishBackgroundAnswer, handleGetInterview, handleHealth, handlePostAnswerBackground } from "../server/handlers";
+import { markNodeFailed } from "../../server/db";
+import { finishBackgroundAnswer, handleGetInterview, handleHealth, handlePostAnswerBackground } from "../../server/handlers";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
