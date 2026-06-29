@@ -19,6 +19,7 @@ function authHeaders(): HeadersInit {
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, {
     ...init,
+    credentials: "include",
     headers: {
       ...authHeaders(),
       ...(init?.headers ?? {})
