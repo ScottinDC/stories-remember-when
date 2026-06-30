@@ -17,6 +17,10 @@ export type AuthConfig = {
 
 export type AuthConfigStatus = "loading" | "loaded" | "failed";
 
+export type SessionVerifyResult =
+  | { ok: true; email: string }
+  | { ok: false; status: number; error: string };
+
 type AccessTokenClaims = {
   email?: string;
   exp?: number;
@@ -70,6 +74,70 @@ function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
   }
 }
 
+function readOAuthReturnParams() {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (hash) {
+    return new URLSearchParams(hash);
+  }
+
+  const query = window.location.search.replace(/^\?/, "");
+  if (query) {
+    return new URLSearchParams(query);
+  }
+
+  return null;
+}
+
+function storeOAuthTokens(accessToken: string, refreshToken?: string | null) {
+  sessionStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+  sessionStorage.setItem(OAUTH_RETURN_KEY, "1");
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  if (accessToken.length < 3500) {
+    document.cookie = `nf_jwt=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax${secure}`;
+  }
+  if (refreshToken && refreshToken.length < 3500) {
+    document.cookie = `nf_refresh=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax${secure}`;
+  }
+}
+
+function captureOAuthReturnFromUrl() {
+  if (sessionStorage.getItem(TOKEN_STORAGE_KEY)) {
+    return;
+  }
+
+  const params = readOAuthReturnParams();
+  if (!params) {
+    return;
+  }
+
+  const error = params.get("error");
+  if (error) {
+    const description = params.get("error_description");
+    sessionStorage.setItem(
+      OAUTH_ERROR_KEY,
+      description?.replace(/\+/g, " ") ?? error.replace(/_/g, " ")
+    );
+    window.history.replaceState(null, "", window.location.pathname);
+    return;
+  }
+
+  const accessToken = params.get("access_token");
+  if (accessToken) {
+    storeOAuthTokens(accessToken, params.get("refresh_token"));
+    window.history.replaceState(null, "", window.location.pathname);
+    return;
+  }
+
+  if (params.get("code")) {
+    sessionStorage.setItem(OAUTH_RETURN_KEY, "1");
+    window.history.replaceState(null, "", window.location.pathname);
+  }
+}
+
+if (typeof window !== "undefined") {
+  captureOAuthReturnFromUrl();
+}
+
 export function userFromAccessToken(token: string): AuthUser | null {
   const claims = decodeAccessTokenClaims(token);
   const email = emailFromClaims(claims);
@@ -93,7 +161,7 @@ export function getStoredAccessToken() {
 }
 
 export function hasStoredSession() {
-  return Boolean(getStoredAccessToken());
+  return Boolean(getStoredAccessToken()) || hasOAuthReturnInUrl();
 }
 
 export function consumeOAuthReturnError() {
@@ -141,6 +209,72 @@ export function resolveAuthUser(): AuthUser | null {
 
 export function isInvalidStoredTokenError(message: string) {
   return message === INVALID_STORED_TOKEN_MESSAGE;
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function verifyServerSession(attempts = 1): Promise<SessionVerifyResult> {
+  let lastResult: SessionVerifyResult = {
+    ok: false,
+    status: 401,
+    error: "The server could not verify your sign-in. Please try again."
+  };
+
+  for (let index = 0; index < attempts; index += 1) {
+    const token = getStoredAccessToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch("/api/session", {
+      headers,
+      credentials: "include",
+      cache: "no-store"
+    });
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.text();
+
+    if (/Internal Error/i.test(body)) {
+      lastResult = {
+        ok: false,
+        status: 503,
+        error: "The server is still starting. Please wait a moment and try again."
+      };
+    } else if (response.ok && contentType.includes("application/json")) {
+      try {
+        const payload = JSON.parse(body) as { email?: string };
+        if (payload.email) {
+          return { ok: true, email: payload.email };
+        }
+      } catch {
+        // Fall through to generic error handling.
+      }
+    }
+
+    let error = "The server could not verify your sign-in. Please try again.";
+    if (contentType.includes("application/json")) {
+      try {
+        const payload = JSON.parse(body) as { error?: string };
+        if (payload.error) {
+          error = payload.error;
+        }
+      } catch {
+        // Keep default message.
+      }
+    }
+
+    lastResult = { ok: false, status: response.status, error };
+
+    if (index < attempts - 1) {
+      await sleep(500 * (index + 1));
+    }
+  }
+
+  return lastResult;
 }
 
 export function loginWithGoogle() {
@@ -194,7 +328,7 @@ export async function fetchAuthConfig() {
 export async function logoutIdentity() {
   clearStoredAccessToken();
   try {
-    await fetch("/.netlify/identity/logout", { method: "POST" });
+    await fetch("/.netlify/identity/logout", { method: "POST", credentials: "include" });
   } catch {
     // Local dev has no Identity endpoint; clearing the token is enough.
   }

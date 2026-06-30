@@ -9,6 +9,7 @@ import {
   loginWithGoogle,
   logoutIdentity,
   resolveAuthUser,
+  verifyServerSession,
   type AuthConfig,
   type AuthConfigStatus,
   type AuthUser
@@ -49,26 +50,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const finishingOAuth = hasOAuthReturnInUrl();
 
     try {
-      let currentUser: AuthUser | null = null;
-
-      try {
-        currentUser = resolveAuthUser();
-      } catch (authError) {
-        const message = authError instanceof Error ? authError.message : "Google sign-in failed.";
-        if (isInvalidStoredTokenError(message)) {
-          clearStoredAccessToken();
+      if (import.meta.env.DEV) {
+        try {
+          const devUser = resolveAuthUser();
+          if (!devUser) {
+            setConfig({ authRequired: false, authConfigured: true });
+            setConfigStatus("loaded");
+            setUser({ email: "local-dev@remember-when.local" });
+            return;
+          }
+        } catch (authError) {
+          const message = authError instanceof Error ? authError.message : "Google sign-in failed.";
+          if (isInvalidStoredTokenError(message)) {
+            clearStoredAccessToken();
+          }
+          setUser(null);
+          setError(message);
+          setConfigStatus("loaded");
+          return;
         }
-        setUser(null);
-        setError(message);
-        setConfigStatus("loaded");
-        return;
-      }
-
-      if (import.meta.env.DEV && !currentUser) {
-        setConfig({ authRequired: false, authConfigured: true });
-        setConfigStatus("loaded");
-        setUser({ email: "local-dev@remember-when.local" });
-        return;
       }
 
       const authConfig = await fetchAuthConfig();
@@ -81,15 +81,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (!currentUser) {
-        setUser(null);
-        if (finishingOAuth) {
-          setError("Google sign-in did not finish. Use “Continue with Google” again.");
-        }
+      const session = await verifyServerSession(finishingOAuth ? 5 : 1);
+      if (session.ok) {
+        setUser({ email: session.email });
         return;
       }
 
-      setUser(currentUser);
+      try {
+        const localUser = resolveAuthUser();
+        if (localUser) {
+          setUser(null);
+          setError(session.error);
+          if (session.status === 401 || session.status === 403) {
+            clearStoredAccessToken();
+          }
+          return;
+        }
+      } catch (authError) {
+        const message = authError instanceof Error ? authError.message : "Google sign-in failed.";
+        if (isInvalidStoredTokenError(message)) {
+          clearStoredAccessToken();
+        }
+        setUser(null);
+        setError(message);
+        return;
+      }
+
+      setUser(null);
+      if (finishingOAuth) {
+        setError(session.error || "Google sign-in did not finish. Use “Continue with Google” again.");
+      } else if (session.status === 403) {
+        setError(session.error);
+      } else if (getStoredAccessToken()) {
+        setError(session.error);
+      }
     } catch (bootstrapError) {
       const message =
         bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";

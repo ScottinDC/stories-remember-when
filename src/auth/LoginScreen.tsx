@@ -11,9 +11,10 @@ export function LoginScreen() {
     hasAllowedEmailsKey,
     loginWithGoogle,
     logout,
-    retryBootstrap
+    retryBootstrap,
+    user
   } = useAuth();
-  const hasSession = Boolean(getAccessToken());
+  const hasSession = Boolean(getAccessToken() || user);
 
   return (
     <main className="grid min-h-screen place-items-center px-5">

@@ -83,14 +83,23 @@ await check("2. OAuth capture script in HTML shell", async () => {
   if (!html.includes("remember-when.auth-token")) {
     throw new Error("missing remember-when.auth-token handler in HTML");
   }
-  if (!html.includes("remember-when.oauth-return")) {
-    throw new Error("missing remember-when.oauth-return handler in HTML");
+  if (!html.includes('params.get("code")')) {
+    throw new Error("missing authorization-code OAuth handler in HTML");
   }
   if (!html.includes('type="module"')) throw new Error("missing Vite module script");
   return "OAuth pre-bootstrap script present";
 });
 
-await check("3. /api/health", async () => {
+await check("3. /api/session unauthenticated 401 JSON", async () => {
+  const res = await fetch(`${BASE}/api/session`);
+  const ct = res.headers.get("content-type") ?? "";
+  const text = await res.text();
+  if (res.status !== 401) throw new Error(`expected 401, got ${res.status}: ${text.slice(0, 200)}`);
+  if (!ct.includes("application/json")) throw new Error(`expected JSON, got ${ct}`);
+  return text;
+});
+
+await check("4. /api/health", async () => {
   const res = await fetch(`${BASE}/api/health`);
   const body = await res.json();
   if (res.status !== 200) throw new Error(`status ${res.status}`);
@@ -100,7 +109,7 @@ await check("3. /api/health", async () => {
   return JSON.stringify(body);
 });
 
-await check("4. /api/interview unauthenticated 401 JSON", async () => {
+await check("5. /api/interview unauthenticated 401 JSON", async () => {
   const res = await fetch(`${BASE}/api/interview`);
   const ct = res.headers.get("content-type") ?? "";
   const text = await res.text();
@@ -110,16 +119,22 @@ await check("4. /api/interview unauthenticated 401 JSON", async () => {
   return text;
 });
 
-await check("5. Authenticated /api/interview 200 JSON", async () => {
+await check("6. Authenticated /api/session + /api/interview 200 JSON", async () => {
   const email = await resolveAllowlistedEmail();
   const jwt = makeUnsignedJwt(email);
+  const headers = {
+    Authorization: `Bearer ${jwt}`,
+    Cookie: `nf_jwt=${encodeURIComponent(jwt)}`
+  };
+
+  const sessionRes = await fetch(`${BASE}/api/session`, { headers });
+  const sessionText = await sessionRes.text();
+  if (sessionRes.status !== 200) {
+    throw new Error(`session expected 200, got ${sessionRes.status}: ${sessionText.slice(0, 200)}`);
+  }
+
   const start = Date.now();
-  const res = await fetch(`${BASE}/api/interview`, {
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      Cookie: `nf_jwt=${encodeURIComponent(jwt)}`
-    }
-  });
+  const res = await fetch(`${BASE}/api/interview`, { headers });
   const elapsed = Date.now() - start;
   const ct = res.headers.get("content-type") ?? "";
   const text = await res.text();
@@ -133,16 +148,16 @@ await check("5. Authenticated /api/interview 200 JSON", async () => {
   if (!Array.isArray(body.nodes) || body.nodes.length < 1) {
     throw new Error("missing interview nodes in response");
   }
-  return `200 in ${elapsed}ms, ${body.nodes.length} nodes for ${email}`;
+  return `session 200, interview 200 in ${elapsed}ms, ${body.nodes.length} nodes for ${email}`;
 });
 
-await check("6. Identity settings", async () => {
+await check("7. Identity settings", async () => {
   const res = await fetch(`${BASE}/.netlify/identity/settings`);
   if (res.status !== 200) throw new Error(`status ${res.status}`);
   return `status ${res.status}`;
 });
 
-await check("7. OAuth authorize redirect", async () => {
+await check("8. OAuth authorize redirect", async () => {
   const url = `${BASE}/.netlify/identity/authorize?provider=google&redirect_uri=${encodeURIComponent(BASE + "/")}`;
   const res = await fetch(url, { redirect: "manual" });
   const location = res.headers.get("location") ?? "";
