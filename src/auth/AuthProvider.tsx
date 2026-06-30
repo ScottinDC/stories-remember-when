@@ -1,10 +1,11 @@
 import React from "react";
 import {
-  clearStoredAccessToken,
   clearOAuthReturnFlag,
+  clearStoredAccessToken,
   fetchAuthConfig,
   getStoredAccessToken,
   hasOAuthReturnInUrl,
+  isInvalidStoredTokenError,
   loginWithGoogle,
   logoutIdentity,
   resolveAuthUser,
@@ -48,51 +49,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const finishingOAuth = hasOAuthReturnInUrl();
 
     try {
-      let authConfig: AuthConfig;
-      let currentUser: AuthUser | null;
+      let currentUser: AuthUser | null = null;
 
-      if (finishingOAuth) {
-        getStoredAccessToken();
-        currentUser = await resolveAuthUser();
-        authConfig = await fetchAuthConfig();
-      } else {
-        authConfig = await fetchAuthConfig();
-        currentUser = await resolveAuthUser();
+      try {
+        currentUser = resolveAuthUser();
+      } catch (authError) {
+        const message = authError instanceof Error ? authError.message : "Google sign-in failed.";
+        if (isInvalidStoredTokenError(message)) {
+          clearStoredAccessToken();
+        }
+        setUser(null);
+        setError(message);
+        setConfigStatus("loaded");
+        return;
       }
 
+      if (import.meta.env.DEV && !currentUser) {
+        setConfig({ authRequired: false, authConfigured: true });
+        setConfigStatus("loaded");
+        setUser({ email: "local-dev@remember-when.local" });
+        return;
+      }
+
+      const authConfig = await fetchAuthConfig();
       setConfig(authConfig);
       setConfigStatus("loaded");
 
       if (!authConfig.authRequired) {
-        if (import.meta.env.DEV) {
-          setUser({ email: "local-dev@remember-when.local" });
-        } else {
-          setUser(null);
-          setError("Access control is misconfigured. Redeploy after setting ALLOWED_EMAILS in Netlify.");
-        }
+        setUser(null);
+        setError("Access control is misconfigured. Redeploy after setting ALLOWED_EMAILS in Netlify.");
         return;
       }
 
       if (!currentUser) {
-        clearStoredAccessToken();
         setUser(null);
+        if (finishingOAuth) {
+          setError("Google sign-in did not finish. Use “Continue with Google” again.");
+        }
         return;
       }
 
       setUser(currentUser);
     } catch (bootstrapError) {
-      if (import.meta.env.DEV) {
-        setConfig({ authRequired: false, authConfigured: true });
-        setConfigStatus("loaded");
-        setUser({ email: "local-dev@remember-when.local" });
-        setError(null);
-      } else {
-        const message =
-          bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
-        setUser(null);
-        setConfigStatus("failed");
-        setError(message);
-      }
+      const message =
+        bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
+      setUser(null);
+      setConfigStatus("failed");
+      setError(message);
     } finally {
       clearOAuthReturnFlag();
       setLoading(false);

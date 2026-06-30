@@ -14,6 +14,37 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Capture Google OAuth tokens before any app code runs (hash is lost if we wait). -->
+    <script>
+      (function () {
+        var hash = window.location.hash.replace(/^#/, "");
+        if (!hash) return;
+        var params = new URLSearchParams(hash);
+        var error = params.get("error");
+        if (error) {
+          var description = params.get("error_description");
+          sessionStorage.setItem(
+            "remember-when.oauth-error",
+            description ? description.replace(/\+/g, " ") : error.replace(/_/g, " ")
+          );
+          history.replaceState(null, "", window.location.pathname);
+          return;
+        }
+        var accessToken = params.get("access_token");
+        if (!accessToken) return;
+        sessionStorage.setItem("remember-when.auth-token", accessToken);
+        sessionStorage.setItem("remember-when.oauth-return", "1");
+        var secure = window.location.protocol === "https:" ? "; Secure" : "";
+        document.cookie =
+          "nf_jwt=" + encodeURIComponent(accessToken) + "; Path=/; SameSite=Lax" + secure;
+        var refresh = params.get("refresh_token");
+        if (refresh) {
+          document.cookie =
+            "nf_refresh=" + encodeURIComponent(refresh) + "; Path=/; SameSite=Lax" + secure;
+        }
+        history.replaceState(null, "", window.location.pathname);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
