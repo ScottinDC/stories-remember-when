@@ -2,9 +2,11 @@ import React from "react";
 import {
   clearOAuthReturnFlag,
   clearStoredAccessToken,
+  consumeOAuthReturnError,
   fetchAuthConfig,
   getStoredAccessToken,
   hasOAuthReturnInUrl,
+  hasPendingOAuthReturn,
   isInvalidStoredTokenError,
   loginWithGoogle,
   logoutIdentity,
@@ -47,9 +49,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setConfigStatus("loading");
 
-    const finishingOAuth = hasOAuthReturnInUrl();
+    const finishingOAuth = hasPendingOAuthReturn();
 
     try {
+      const oauthError = consumeOAuthReturnError();
+      if (oauthError) {
+        setConfig(await fetchAuthConfig());
+        setConfigStatus("loaded");
+        setUser(null);
+        setError(oauthError);
+        return;
+      }
+
       if (import.meta.env.DEV) {
         try {
           const devUser = resolveAuthUser();
@@ -64,10 +75,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (isInvalidStoredTokenError(message)) {
             clearStoredAccessToken();
           }
+          setConfig(await fetchAuthConfig());
+          setConfigStatus("loaded");
           setUser(null);
           setError(message);
-          setConfigStatus("loaded");
           return;
+        }
+      }
+
+      if (finishingOAuth || getStoredAccessToken()) {
+        const session = await verifyServerSession(finishingOAuth ? 10 : 3);
+        if (session.ok) {
+          setConfig(await fetchAuthConfig());
+          setConfigStatus("loaded");
+          setUser({ email: session.email });
+          return;
+        }
+
+        if (session.status === 403) {
+          setConfig(await fetchAuthConfig());
+          setConfigStatus("loaded");
+          setUser(null);
+          setError(session.error);
+          clearStoredAccessToken();
+          return;
+        }
+
+        if (finishingOAuth) {
+          try {
+            const localUser = resolveAuthUser();
+            if (localUser) {
+              setConfig(await fetchAuthConfig());
+              setConfigStatus("loaded");
+              setUser(localUser);
+              return;
+            }
+          } catch (authError) {
+            const message = authError instanceof Error ? authError.message : "Google sign-in failed.";
+            if (isInvalidStoredTokenError(message)) {
+              clearStoredAccessToken();
+            }
+            setConfig(await fetchAuthConfig());
+            setConfigStatus("loaded");
+            setUser(null);
+            setError(message);
+            return;
+          }
         }
       }
 
@@ -81,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const session = await verifyServerSession(finishingOAuth ? 5 : 1);
+      const session = await verifyServerSession(1);
       if (session.ok) {
         setUser({ email: session.email });
         return;
@@ -112,14 +165,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(session.error || "Google sign-in did not finish. Use “Continue with Google” again.");
       } else if (session.status === 403) {
         setError(session.error);
-      } else if (getStoredAccessToken()) {
-        setError(session.error);
       }
     } catch (bootstrapError) {
       const message =
         bootstrapError instanceof Error ? bootstrapError.message : "Could not verify sign-in.";
+      setConfig(await fetchAuthConfig());
+      setConfigStatus("loaded");
       setUser(null);
-      setConfigStatus("failed");
       setError(message);
     } finally {
       clearOAuthReturnFlag();

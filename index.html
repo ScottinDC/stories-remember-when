@@ -20,17 +20,22 @@
           if (accessToken) {
             sessionStorage.setItem("remember-when.auth-token", accessToken);
             sessionStorage.setItem("remember-when.oauth-return", "1");
+            sessionStorage.removeItem("remember-when.oauth-code");
             var secure = window.location.protocol === "https:" ? "; Secure" : "";
-            document.cookie =
-              "nf_jwt=" + encodeURIComponent(accessToken) + "; Path=/; SameSite=Lax" + secure;
+            if (accessToken.length < 3500) {
+              document.cookie =
+                "nf_jwt=" + encodeURIComponent(accessToken) + "; Path=/; SameSite=Lax" + secure;
+            }
             var refresh = params.get("refresh_token");
-            if (refresh) {
+            if (refresh && refresh.length < 3500) {
               document.cookie =
                 "nf_refresh=" + encodeURIComponent(refresh) + "; Path=/; SameSite=Lax" + secure;
             }
             return true;
           }
-          if (params.get("code")) {
+          var code = params.get("code");
+          if (code) {
+            sessionStorage.setItem("remember-when.oauth-code", code);
             sessionStorage.setItem("remember-when.oauth-return", "1");
             return true;
           }
@@ -50,6 +55,7 @@
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="origin" />
     <title>Remember When</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

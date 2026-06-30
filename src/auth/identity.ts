@@ -1,8 +1,15 @@
 const TOKEN_STORAGE_KEY = "remember-when.auth-token";
 const OAUTH_RETURN_KEY = "remember-when.oauth-return";
 const OAUTH_ERROR_KEY = "remember-when.oauth-error";
+const OAUTH_CODE_KEY = "remember-when.oauth-code";
 export const INVALID_STORED_TOKEN_MESSAGE =
   "Google sign-in returned a token the app could not read. Try again.";
+
+const DEFAULT_AUTH_CONFIG: AuthConfig = {
+  authRequired: true,
+  authConfigured: true,
+  hasAllowedEmailsKey: true
+};
 
 export type AuthUser = {
   email: string;
@@ -91,6 +98,7 @@ function readOAuthReturnParams() {
 function storeOAuthTokens(accessToken: string, refreshToken?: string | null) {
   sessionStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
   sessionStorage.setItem(OAUTH_RETURN_KEY, "1");
+  sessionStorage.removeItem(OAUTH_CODE_KEY);
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   if (accessToken.length < 3500) {
     document.cookie = `nf_jwt=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax${secure}`;
@@ -128,7 +136,9 @@ function captureOAuthReturnFromUrl() {
     return;
   }
 
-  if (params.get("code")) {
+  const code = params.get("code");
+  if (code) {
+    sessionStorage.setItem(OAUTH_CODE_KEY, code);
     sessionStorage.setItem(OAUTH_RETURN_KEY, "1");
     window.history.replaceState(null, "", window.location.pathname);
   }
@@ -160,8 +170,16 @@ export function getStoredAccessToken() {
   return fromCookie;
 }
 
+export function hasPendingOAuthReturn() {
+  return (
+    sessionStorage.getItem(OAUTH_RETURN_KEY) === "1" ||
+    Boolean(sessionStorage.getItem(OAUTH_CODE_KEY)) ||
+    Boolean(sessionStorage.getItem(OAUTH_ERROR_KEY))
+  );
+}
+
 export function hasStoredSession() {
-  return Boolean(getStoredAccessToken()) || hasOAuthReturnInUrl();
+  return Boolean(getStoredAccessToken()) || hasPendingOAuthReturn();
 }
 
 export function consumeOAuthReturnError() {
@@ -178,11 +196,13 @@ export function hasOAuthReturnInUrl() {
 
 export function clearOAuthReturnFlag() {
   sessionStorage.removeItem(OAUTH_RETURN_KEY);
+  sessionStorage.removeItem(OAUTH_CODE_KEY);
 }
 
 export function clearStoredAccessToken() {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
   sessionStorage.removeItem(OAUTH_RETURN_KEY);
+  sessionStorage.removeItem(OAUTH_CODE_KEY);
   sessionStorage.removeItem(OAUTH_ERROR_KEY);
   document.cookie = "nf_jwt=; Path=/; Max-Age=0; SameSite=Lax";
   document.cookie = "nf_refresh=; Path=/; Max-Age=0; SameSite=Lax";
@@ -229,11 +249,24 @@ export async function verifyServerSession(attempts = 1): Promise<SessionVerifyRe
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch("/api/session", {
-      headers,
-      credentials: "include",
-      cache: "no-store"
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/session", {
+        headers,
+        credentials: "include",
+        cache: "no-store"
+      });
+    } catch {
+      lastResult = {
+        ok: false,
+        status: 503,
+        error: "Could not reach the server. Check your connection and try again."
+      };
+      if (index < attempts - 1) {
+        await sleep(600 * (index + 1));
+      }
+      continue;
+    }
 
     const contentType = response.headers.get("content-type") ?? "";
     const body = await response.text();
@@ -265,12 +298,14 @@ export async function verifyServerSession(attempts = 1): Promise<SessionVerifyRe
       } catch {
         // Keep default message.
       }
+    } else if (!contentType.includes("application/json") && body) {
+      error = "The app could not reach the API. Please try again in a moment.";
     }
 
     lastResult = { ok: false, status: response.status, error };
 
     if (index < attempts - 1) {
-      await sleep(500 * (index + 1));
+      await sleep(600 * (index + 1));
     }
   }
 
@@ -278,21 +313,16 @@ export async function verifyServerSession(attempts = 1): Promise<SessionVerifyRe
 }
 
 export function loginWithGoogle() {
-  const redirectUri = `${window.location.origin}/`;
-  const params = new URLSearchParams({
-    provider: "google",
-    redirect_uri: redirectUri
-  });
-  window.location.assign(`/.netlify/identity/authorize?${params.toString()}`);
+  window.location.assign("/.netlify/identity/authorize?provider=google");
 }
 
-export async function fetchAuthConfig() {
+export async function fetchAuthConfig(): Promise<AuthConfig> {
   const attempts = 3;
   let lastError: Error | null = null;
 
   for (let index = 0; index < attempts; index += 1) {
     try {
-      const response = await fetch("/api/health", { cache: "no-store" });
+      const response = await fetch("/api/health", { cache: "no-store", credentials: "same-origin" });
       const contentType = response.headers.get("content-type") ?? "";
 
       if (!response.ok) {
@@ -317,12 +347,13 @@ export async function fetchAuthConfig() {
     } catch (error) {
       lastError = error instanceof Error ? error : new Error("Could not load auth settings.");
       if (index < attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 800 * (index + 1)));
+        await sleep(800 * (index + 1));
       }
     }
   }
 
-  throw lastError ?? new Error("Could not load auth settings.");
+  console.warn("fetchAuthConfig failed after retries:", lastError?.message);
+  return DEFAULT_AUTH_CONFIG;
 }
 
 export async function logoutIdentity() {

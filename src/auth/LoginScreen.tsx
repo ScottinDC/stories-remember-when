@@ -1,5 +1,5 @@
 import { Loader2, LogOut } from "lucide-react";
-import { hasOAuthReturnInUrl } from "./identity";
+import { hasPendingOAuthReturn } from "./identity";
 import { useAuth } from "./AuthProvider";
 
 export function LoginScreen() {
@@ -31,7 +31,14 @@ export function LoginScreen() {
             Sign in with Google to continue. Only pre-approved family accounts can access this interview.
           </p>
 
-          {configStatus === "failed" ? (
+          {error ? (
+            <div className="space-y-3 rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
+              <p>{error}</p>
+              <button className="btn-secondary w-full justify-center" onClick={() => void retryBootstrap()} type="button">
+                Try again
+              </button>
+            </div>
+          ) : configStatus === "failed" ? (
             <div className="space-y-3 rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">
               <p>
                 {import.meta.env.DEV
@@ -48,10 +55,6 @@ export function LoginScreen() {
                 ? "ALLOWED_EMAILS is set but no valid addresses were found. Check comma-separated formatting in Netlify, then redeploy."
                 : "Access control is not configured yet. Add ALLOWED_EMAILS in Netlify environment variables with Functions scope, then redeploy."}
             </div>
-          ) : null}
-
-          {error ? (
-            <div className="rounded border border-[#f0caca] bg-[#fff8f8] px-4 py-3 text-sm text-[#9b2c2c]">{error}</div>
           ) : null}
 
           <button
@@ -89,7 +92,7 @@ export function LoginScreen() {
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { authRequired, loading, user } = useAuth();
   const mustSignIn = import.meta.env.PROD || authRequired;
-  const finishingOAuth = hasOAuthReturnInUrl();
+  const finishingOAuth = hasPendingOAuthReturn();
 
   if (loading) {
     return (
